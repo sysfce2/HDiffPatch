@@ -39,6 +39,7 @@
 #include "../HPatch/patch.h"
 #include "../HPatch/patch_private.h"
 #include "private_diff/limit_mem_diff/digest_matcher.h"
+#include "private_diff/window_diff/window_matcher.h"
 #include "private_diff/limit_mem_diff/stream_serialize.h"
 #include "private_diff/match_block.h"
 #include "../../libParallel/parallel_import.h"
@@ -1881,5 +1882,61 @@ hpatch_BOOL hdiff_streamDataIsEqual(const hpatch_TStreamInput* x,const hpatch_TS
         i+=dataSize;
     }
     return hpatch_TRUE;
+}
+
+void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                size_t kNewWindowSize,size_t kOldWindowSize,std::vector<TCover>& out_covers,
+                                size_t kBigCoverSize,size_t kMatchBlockSize,int kMinSingleMatchScore,
+                                bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets,bool isCanExtendCover){
+    mtsets=mtsets?mtsets:&hdiff_TMTSets_s_kEmpty;
+    std::vector<hpatch_TWindow> windows;
+    std::vector<std::vector<hpatch_TCover> > bigCoverss;
+    get_match_windows(newData,oldData,kNewWindowSize,kOldWindowSize,windows,
+                      bigCoverss,kBigCoverSize,kMatchBlockSize,mtsets);
+    size_t insertWi=0;
+    std::vector<TCover> covers;
+    for (size_t i=0;i<windows.size();++i){
+        //todo: ? start mtsets->threadNum threads run get_match_covers_in_a_window(...,1,isCanExtendCover);
+        covers.clear();
+        get_match_covers_in_a_window(newData,oldData,windows[i],bigCoverss[i],covers,
+                                     kMinSingleMatchScore,isUseBigCacheMatch,mtsets->threadNum,isCanExtendCover);
+        if (windows[i].oldLength>0){
+            windows[insertWi++]=windows[i];
+            out_covers.insert(out_covers.end(),covers.begin(),covers.end());
+        }
+    }
+    windows.resize(insertWi);
+    if (windows.size()>1)
+        collate_covers(out_covers);
+}
+
+
+void get_match_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                       size_t kNewWindowSize,size_t kOldWindowSize,std::vector<hpatch_TWindow>& out_windows,
+                       std::vector<std::vector<TCover> >& out_bigCoverss,size_t kBigCoverSize,
+                       size_t kMatchBlockSize,const hdiff_TMTSets_s* mtsets){
+    mtsets=mtsets?mtsets:&hdiff_TMTSets_s_kEmpty;
+    std::vector<TCover> covers;
+    get_match_covers_by_stream(newData,oldData,covers,kMatchBlockSize,mtsets);
+    TWindowMatcher windowMatcher(newData->streamSize,oldData->streamSize,kNewWindowSize,kOldWindowSize,
+                                 kBigCoverSize,covers,mtsets->threadNum);
+    windowMatcher.search_windows(out_windows);
+    getBigCoversInWindows(out_bigCoverss,covers,out_windows,kBigCoverSize);
+}
+
+void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                  hpatch_TWindow& window,const std::vector<TCover>& bigCovers,
+                                  std::vector<TCover>& out_covers,int kMinSingleMatchScore,
+                                  bool isUseBigCacheMatch,size_t threadNum,bool isCanExtendCover){
+    assert(window.newLength>0);
+    if (window.oldLength==0) return;
+    TAutoMem mem;
+    loadOldAndNewStream(mem,oldData,window.oldPos,window.oldLength,
+                        newData,window.newPos,window.newLength);
+    unsigned char* pOldData=mem.data();
+    unsigned char* pNewData=pOldData+window.oldLength;
+    get_match_covers_by_sstring(pNewData,pNewData+window.newLength,pOldData,pOldData+window.oldLength,
+                                out_covers,kMinSingleMatchScore,isUseBigCacheMatch,threadNum,isCanExtendCover,0);
+    updateCoversIntoWindows(out_covers,window);
 }
 

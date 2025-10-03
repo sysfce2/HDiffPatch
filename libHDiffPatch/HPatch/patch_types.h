@@ -346,6 +346,15 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
 
     hpatch_BOOL sspatch_covers_nextCover(sspatch_covers_t* self);
     
+
+    typedef struct{
+        hpatch_StreamPos_t  oldPos;
+        hpatch_StreamPos_t  newPos;
+        hpatch_size_t       oldLength;
+        hpatch_size_t       newLength;
+    } hpatch_TWindow;
+
+
 #ifdef __cplusplus
 }
 #endif

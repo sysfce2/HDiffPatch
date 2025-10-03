@@ -253,6 +253,28 @@ void get_match_covers_by_stream_and_sstring(unsigned char* newData,unsigned char
                                             int kMinSingleMatchScore=kMinSingleMatchScore_default,bool isUseBigCacheMatch=false,
                                             size_t threadNum=1,bool isExtendCover=true);
 
+
+static const size_t kMatchWindowsBlockSize_default = (1<<5);
+static const size_t kDefaultBigCoverSize = 1024*8;
+
+//same as create?compressed_diff_window(), but not serialize diffData, only got covers
+//  get_match_windows() + loop get_match_covers_in_a_window()
+void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                size_t kNewWindowSize,size_t kOldWindowSize,std::vector<TCover>& out_covers,
+                                size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
+                                int kMinSingleMatchScore=kMinSingleMatchScore_default,bool isUseBigCacheMatch=false,
+                                const hdiff_TMTSets_s* mtsets=0,bool isCanExtendCover=true);
+
+void get_match_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                       size_t kNewWindowSize,size_t kOldWindowSize,std::vector<hpatch_TWindow>& out_windows,
+                       std::vector<std::vector<TCover> >& out_bigCoverss,size_t kBigCoverSize=kDefaultBigCoverSize,
+                       size_t kMatchBlockSize=kMatchWindowsBlockSize_default,const hdiff_TMTSets_s* mtsets=0);
+void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                  hpatch_TWindow& window,const std::vector<TCover>& bigCovers,
+                                  std::vector<TCover>& out_covers,int kMinSingleMatchScore=kMinSingleMatchScore_default,
+                                  bool isUseBigCacheMatch=false,size_t threadNum=1,bool isCanExtendCover=true);
+
+
 //covers type TInputCovers, can pass std::vector<TCover>
 // if (!isExtendCover), not read oldStream's data, only used oldStream->streamSize
 void serialize_compressed_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
