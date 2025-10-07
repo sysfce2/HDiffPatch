@@ -47,6 +47,11 @@
 
 #if (defined _SA_SORTBY_STD_SORT) || (defined _SA_MATCHBY_STD_LOWER_BOUND)
     #include <algorithm> //sort,lower_bound
+    #include <execution> //std::execution::par_unseq: for C++17 parallel sort
+    #include "qsort_parallel.h" //sort_parallel: a simple multi-thread sort; not optimized for sstring
+    static const int kMaxCmpLength_sort=1024*4; //WARNING: This is a special handling measure to prevent _suffixString_create from degrading
+                      //  to O(n*n) complexity in some cases when using std::sort (unacceptable runtime). Set a maximum comparison length to control the algorithm
+                       //  Within O(kMaxCmpLength_sort*n) complexity, note that the sorted result is not a standard suffix array;
 #endif
 #ifdef _SA_SORTBY_SAIS
     #include "sais.hxx"
@@ -71,18 +76,14 @@ namespace {
 
     static bool getStringIsLess(const TChar* str0,const TChar* str0End,
                                 const TChar* str1,const TChar* str1End){
-        TInt L0=(TInt)(str0End-str0);
-        TInt L1=(TInt)(str1End-str1);
+        size_t L0=(size_t)(str0End-str0);
+        size_t L1=(size_t)(str1End-str1);
     #ifdef _SA_SORTBY_STD_SORT
-        const int kMaxCmpLength_sort=1024*4; //WARNING: This is a special handling measure to prevent _suffixString_create from degrading
-                                        //  to O(n*n) complexity in some cases when using std::sort (unacceptable runtime). Set a maximum comparison length to control the algorithm
-                                        //  Within O(kMaxCmpLength_sort*n) complexity, note that the sorted result is not a standard suffix array;
-        if (L0>kMaxCmpLength_sort) L0=kMaxCmpLength_sort;
-        if (L1>kMaxCmpLength_sort) L1=kMaxCmpLength_sort;
+        L0=(L0<=kMaxCmpLength_sort)?L0:kMaxCmpLength_sort;
+        L1=(L1<=kMaxCmpLength_sort)?L1:kMaxCmpLength_sort;
     #endif
-        TInt LMin;
-        if (L0<L1) LMin=L0; else LMin=L1;
-        for (int i=0; i<LMin; ++i){
+        size_t LMin=(L0<L1)?L0:L1;
+        for (size_t i=0; i<LMin; ++i){
             TInt sub=str0[i]-str1[i];
             if (!sub) continue;
             return sub<0;
@@ -116,18 +117,21 @@ namespace {
     template<class TSAInt>
     static void _suffixString_create(const TChar* src,const TChar* src_end,
                                      std::vector<TSAInt>& out_sstring,size_t threadNum){
-        size_t size=(size_t)(src_end-src);
+        TSAInt size=(TSAInt)(src_end-src);
         if (size<0)
             throw std::runtime_error("suffixString_create() error.");
         out_sstring.resize(size);
-        if (size<=0) return;
+        if (size==0) return;
     #ifdef _SA_SORTBY_STD_SORT
-        for (TSAInt i=0;i<size;++i)
+        for (TSAInt i=0;i<(TSAInt)size;++i)
             out_sstring[i]=i;
         int rt=0;
         try {
-            std::sort<TSAInt*,const TSuffixString_compare&>(&out_sstring[0],&out_sstring[0]+size,
-                                                            TSuffixString_compare(src,src_end));
+            const TSuffixString_compare cmp(src,src_end);
+            //std::sort(&out_sstring[0],&out_sstring[0]+size,cmp);
+            //std::sort(std::execution::par_unseq,&out_sstring[0],&out_sstring[0]+size,cmp);//need C++17
+            sort_parallel<TSAInt,const TSuffixString_compare&,1024*8,137>
+                    (&out_sstring[0],&out_sstring[0]+size,cmp,threadNum);
         } catch (...) {
             rt=-1;
         }
@@ -145,17 +149,12 @@ namespace {
        if (rt!=0)
             throw std::runtime_error("suffixString_create() error.");
     }
-    
-#ifdef _SA_MATCHBY_STD_LOWER_BOUND
-#else
-    template <class T> inline static T* __select_mid(T*& p,size_t n) { return p+(n>>1); }
-            //'&' for hack cpu cache speed for xcode, somebody know way?
-#endif
+
     template <class T>
-    inline static const T* _lower_bound(const T* rbegin,const T* rend,
-                                        const TChar* str,const TChar* str_end,
-                                        const TChar* src_begin,const TChar* src_end,
-                                        size_t min_eq=0){
+    static hpatch_force_inline const T* _lower_bound(const T* rbegin,const T* rend,
+                                                     const TChar* str,const TChar* str_end,
+                                                     const TChar* src_begin,const TChar* src_end,
+                                                     size_t min_eq=0){
 #ifdef _SA_MATCHBY_STD_LOWER_BOUND
         return std::lower_bound<const T*,StringToken,const TSuffixString_compare&>
                     (rbegin,rend,StringToken(str,str_end),TSuffixString_compare(src_begin,src_end));
@@ -163,29 +162,27 @@ namespace {
         size_t left_eq=min_eq;
         size_t right_eq=min_eq;
         while (size_t len=(size_t)(rend-rbegin)) {
-            const T* mid=__select_mid(rbegin,len);
+            const T* mid=rbegin+(len>>1);
+            const TChar* ss=src_begin+(*mid);
             size_t eq_len=(left_eq<=right_eq)?left_eq:right_eq;
-            const TChar* vs=str+eq_len;
-            const TChar* ss=src_begin+(*mid)+eq_len;
-            bool is_less;
-            while (true) {
-                if (vs==str_end) { is_less=false; break; };
-                if (ss==src_end) { is_less=true;  break; };
-                TInt sub=(*ss)-(*vs);
-                if (!sub) {
-                    ++vs;
-                    ++ss;
-                    ++eq_len;
-                    const int kMaxCmpLength_forLimitRangeDiff=1024*8; 
-                    if (eq_len<kMaxCmpLength_forLimitRangeDiff) //only for optimize limitRange match speed
-                        continue;
-                    else
-                        return mid;
-                }else{
-                    is_less=(sub<0);
-                    break;
-                }
+        #ifdef _SA_SORTBY_STD_SORT
+            const int kMaxCmpLength_forLimitRangeDiff=kMaxCmpLength_sort; 
+        #else
+            const int kMaxCmpLength_forLimitRangeDiff=1024*8; //only for optimize limitRange match speed
+        #endif
+            size_t cmp_len=((src_end-ss)<(str_end-str))?(src_end-ss):(str_end-str);
+            cmp_len=(cmp_len<kMaxCmpLength_forLimitRangeDiff)?cmp_len:kMaxCmpLength_forLimitRangeDiff;
+            while ((eq_len<cmp_len)&&((ss[eq_len])==(str[eq_len]))){
+                ++eq_len;
             }
+            if (eq_len>=kMaxCmpLength_forLimitRangeDiff)
+                return mid;
+            
+            bool is_less;
+            if      (str+eq_len==str_end) is_less=false;
+            else if (ss+eq_len==src_end)  is_less=true;
+            else                          is_less=ss[eq_len]<str[eq_len];
+
             if (is_less){
                 left_eq=eq_len;
                 rbegin=mid+1;
@@ -276,6 +273,7 @@ void TSuffixString::resetSuffixString(const TChar* src_begin,const TChar* src_en
     assert(src_begin<=src_end);
     m_src_begin=src_begin;
     m_src_end=src_end;
+    m_isUseLargeSA=_isNeedUseLargeSA(src_end-src_begin);
     if (isUseLargeSA()){
         _clearVector(m_SA_limit);
         _suffixString_create(m_src_begin,m_src_end,m_SA_large,threadNum);
@@ -292,14 +290,16 @@ TInt TSuffixString::lower_bound(const TChar* str,const TChar* str_end)const{
     //return m_lower_bound(m_cached_SA_begin,m_cached_SA_end,
     //                     str,str_end,m_src_begin,m_src_end,m_cached_SA_begin,0);
 #if (_SSTRING_FAST_MATCH>0)
+    #define kMinStrLen _SSTRING_FAST_MATCH
+    assert((size_t)(str_end-str)>=kMinStrLen);
     if (m_isUsedFastMatch&&(!m_fastMatch.isHit(TFastMatchForSString::getHash(str))))
         return -1;
-    #define kMinStrLen _SSTRING_FAST_MATCH
 #else
     //assert(str_end-str>=2);
     #define kMinStrLen 2
+    assert((size_t)(str_end-str)>=kMinStrLen);
 #endif
-    if ((kMinStrLen>=2)&(m_cached2char_range!=0)){
+    if ((kMinStrLen>=2)&&(m_cached2char_range!=0)){
         size_t cc=((size_t)str[1]) | (((size_t)str[0])<<8);
         size_t r0,r1;
         if (isUseLargeSA()){

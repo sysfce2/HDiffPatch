@@ -65,27 +65,19 @@ hpatch_BOOL hpatch_packUIntWithTag(TByte** out_code,TByte* out_code_end,
                                    const hpatch_uint kTagBit){//write out integer and advance pointer.
     TByte*          pcode=*out_code;
     const hpatch_StreamPos_t kMaxValueWithTag=((hpatch_StreamPos_t)1<<(7-kTagBit))-1;
-    TByte           codeBuf[hpatch_kMaxPackedUIntBytes];
-    TByte*          codeEnd=codeBuf;
+    size_t bCount=0;
+    assert((0<=kTagBit)&&(kTagBit<=7));
+    assert((highTag>>kTagBit)==0);
+    while ((uValue>>(7*bCount))>kMaxValueWithTag)
+        ++bCount;
 #ifdef __RUN_MEM_SAFE_CHECK
-    //static const hpatch_uint kPackMaxTagBit=7;
-    //assert((0<=kTagBit)&&(kTagBit<=kPackMaxTagBit));
-    //assert((highTag>>kTagBit)==0);
+    if ((size_t)(out_code_end-pcode)<(1+bCount)) return _hpatch_FALSE;
 #endif
-    while (uValue>kMaxValueWithTag) {
-        *codeEnd=uValue&((1<<7)-1); ++codeEnd;
-        uValue>>=7;
-    }
-#ifdef __RUN_MEM_SAFE_CHECK
-    if ((out_code_end-pcode)<(1+(codeEnd-codeBuf))) return _hpatch_FALSE;
-#endif
-    *pcode=(TByte)( (TByte)uValue | (highTag<<(8-kTagBit))
-                   | (((codeBuf!=codeEnd)?1:0)<<(7-kTagBit))  );
-    ++pcode;
-    while (codeBuf!=codeEnd) {
-        --codeEnd;
-        *pcode=(*codeEnd) | (TByte)(((codeBuf!=codeEnd)?1:0)<<7);
-        ++pcode;
+    *pcode++=(TByte)( (TByte)(uValue>>(7*bCount)) | (highTag<<(8-kTagBit))
+                   | (((bCount>0)?1:0)<<(7-kTagBit))  );
+    while (bCount>0) {
+        --bCount;
+        *pcode++=((uValue>>(7*bCount))&((1<<7)-1)) | (TByte)(((bCount>0)?1:0)<<7);
     }
     *out_code=pcode;
     return hpatch_TRUE;
