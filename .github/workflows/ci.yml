@@ -1,6 +1,7 @@
 name: ci
 on: [push, pull_request]
 jobs:
+
   gcc-build:
     strategy:
       matrix:
@@ -137,4 +138,6 @@ jobs:
           git clone --depth=1 https://github.com/sisong/libdeflate.git ../libdeflate
       - name: buildByVC
         run: |
-          msbuild builds/vc/HDiffPatch.sln -t:rebuild -verbosity:diag -property:Configuration=Release
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -verbosity:diag -property:Platform=x64 -property:Configuration=Release
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -verbosity:diag -property:Platform=x86 -property:Configuration=Release
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -verbosity:diag -property:Platform=ARM64 -property:Configuration=Release
