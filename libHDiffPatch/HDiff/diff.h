@@ -240,7 +240,7 @@ void get_match_covers_by_sstring(const unsigned char* newData,const unsigned cha
                                  std::vector<TCover>& out_covers,
                                  int kMinSingleMatchScore=kMinSingleMatchScore_default,
                                  bool isUseBigCacheMatch=false,size_t threadNum=1,
-                                 bool isCanExtendCover=true,ICoverLinesListener* listener=0);
+                                 bool isExtendCover=true,ICoverLinesListener* listener=0);
 
 // get_match_covers_by_stream() got big covers + get_match_covers_by_sstring() got small covers
 void get_match_covers_by_stream_and_sstring(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
@@ -264,7 +264,7 @@ void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_
                                 size_t kNewWindowSize,size_t kOldWindowSize,std::vector<TCover>& out_covers,
                                 size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
                                 int kMinSingleMatchScore=kMinSingleMatchScore_default,bool isUseBigCacheMatch=false,
-                                const hdiff_TMTSets_s* mtsets=0,bool isCanExtendCover=true);
+                                const hdiff_TMTSets_s* mtsets=0,bool isExtendCover=true);
 
 void get_match_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                        size_t kNewWindowSize,size_t kOldWindowSize,std::vector<hpatch_TWindow>& out_windows,
@@ -273,7 +273,7 @@ void get_match_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamIn
 void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                   hpatch_TWindow& window,const std::vector<TCover>& bigCovers,
                                   std::vector<TCover>& out_covers,int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                  bool isUseBigCacheMatch=false,size_t threadNum=1,bool isCanExtendCover=true);
+                                  bool isUseBigCacheMatch=false,size_t threadNum=1,bool isExtendCover=true);
 
 
 //covers type TInputCovers, can pass std::vector<TCover>

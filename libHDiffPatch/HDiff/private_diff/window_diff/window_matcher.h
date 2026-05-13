@@ -29,7 +29,6 @@
 #define window_matcher_h
 #include <vector>
 #include "../../diff_types.h"
-#include "../mem_buf.h"
 namespace hdiff_private{
 
 class TWindowMatcher{
@@ -49,13 +48,18 @@ private:
     const size_t                m_kBigCoverSize;
     std::vector<TCover>&        m_covers;
     const size_t                m_threadNum;
-    TAutoMem                    m_mem;
 };
 
 void getBigCoversInWindows(std::vector<std::vector<TCover> >& out_bigCoverss,const std::vector<TCover>& covers,
                            const std::vector<hpatch_TWindow>& windows,size_t kBigCoverSize);
 
-void updateCoversIntoWindows(std::vector<TCover>& covers,hpatch_TWindow& window);
+void updateCoversPosIntoWindows(std::vector<TCover>& covers,const hpatch_TWindow& window);
+
+void getWindowBoxByCovers(hpatch_TWindow& out_window,const std::vector<TCover>& covers);
+
+//try increasing the window size to slightly increase the chance of a match.
+void extenWindowsForMatch(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,
+                          hpatch_StreamPos_t oldSize,size_t newWindowSize,size_t oldWindowSize);
 
 }//namespace hdiff_private
 #endif
