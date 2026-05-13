@@ -38,7 +38,7 @@ static const int kMinSingleMatchScore_default = 4;
 //       or create_single_compressed_diff() create compressed diff data
 //  kMinSingleMatchScore: default 4, bin: 0--4  text: 4--9
 //  isUseBigCacheMatch: big cache max used O(oldSize) memory, match speed faster, but build big cache slow 
-//  NOTE: create_diff() + patch() or patch_stream() or patch_stream_with_cache() is no longer recommended,
+//  NOTE: create_diff() + patch() or patch_stream() or patch_stream_with_cache() is DEPRECATED,
 //    recommend change to use  create_single_compressed_diff() + patch_single_stream() or patch_single_compressed_diff()
 void create_diff(const unsigned char* newData,const unsigned char* newData_end,
                  const unsigned char* oldData,const unsigned char* oldData_end,
@@ -175,7 +175,7 @@ hpatch_StreamPos_t
 
 //optimize diff speed by match block
 //   get_match_covers_by_stream() got big covers + get_match_covers_by_sstring() got small covers
-//note: newData&oldData in memory will be changed
+//   if (fastMatchBlockSize==0), not used get_match_covers_by_stream()
 //see create_compressed_diff | create_single_compressed_diff
 static const size_t kDefaultFastMatchBlockSize = 1024*1;
 void create_compressed_diff_block(const hpatch_TStreamInput* newData,//will load needed in memory
@@ -185,6 +185,7 @@ void create_compressed_diff_block(const hpatch_TStreamInput* newData,//will load
                                   size_t fastMatchBlockSize=kDefaultFastMatchBlockSize,
                                   int kMinSingleMatchScore=kMinSingleMatchScore_default,
                                   bool isUseBigCacheMatch=false,const hdiff_TMTSets_s* mtsets=0);
+//note: newData&oldData in memory will be changed
 void create_compressed_diff_block(unsigned char* newData,unsigned char* newData_end,
                                   unsigned char* oldData,unsigned char* oldData_end,
                                   const hpatch_TStreamOutput* out_diff,

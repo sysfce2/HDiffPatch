@@ -17,6 +17,7 @@
 		0D3D964329FD3C7F00B37681 /* file_for_patch.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D3D964229FD3C7F00B37681 /* file_for_patch.c */; };
 		0D3D964729FD3CC100B37681 /* dir_diff_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D3D964629FD3CC100B37681 /* dir_diff_tools.cpp */; };
 		0D7FEAAC283124810029772D /* hpatch_lite.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D7FEAA9283124810029772D /* hpatch_lite.c */; };
+		0D99CC8F2E9A611E005CC92A /* match_block.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CC8E2E9A611E005CC92A /* match_block.cpp */; };
 		0DA686642E536CB4002A6651 /* _hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686352E536964002A6651 /* _hpatch_mt.c */; };
 		0DA686652E536CB4002A6651 /* hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686372E536964002A6651 /* hpatch_mt.c */; };
 		0DA686662E536CB4002A6651 /* _houtput_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686382E536964002A6651 /* _houtput_mt.c */; };
@@ -81,6 +82,7 @@
 		0D7FEAA9283124810029772D /* hpatch_lite.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hpatch_lite.c; sourceTree = "<group>"; };
 		0D7FEAAA283124810029772D /* hpatch_lite_input_cache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hpatch_lite_input_cache.h; sourceTree = "<group>"; };
 		0D7FEAAB283124810029772D /* hpatch_lite_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hpatch_lite_types.h; sourceTree = "<group>"; };
+		0D99CC8E2E9A611E005CC92A /* match_block.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = match_block.cpp; sourceTree = "<group>"; };
 		0DA686352E536964002A6651 /* _hpatch_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = _hpatch_mt.c; sourceTree = "<group>"; };
 		0DA686362E536964002A6651 /* _hinput_mt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = _hinput_mt.h; sourceTree = "<group>"; };
 		0DA686372E536964002A6651 /* hpatch_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = hpatch_mt.c; sourceTree = "<group>"; };
@@ -280,6 +282,7 @@
 		D6BD9BA417578491004886DE /* private_diff */ = {
 			isa = PBXGroup;
 			children = (
+				0D99CC8E2E9A611E005CC92A /* match_block.cpp */,
 				0DE343BA2DF807230000234B /* match_inplace.cpp */,
 				D68CD8F31F44367A00A61337 /* limit_mem_diff */,
 				D6EE50611F2A0AA3002854A2 /* compress_detect.cpp */,
@@ -410,6 +413,7 @@
 				0DA686662E536CB4002A6651 /* _houtput_mt.c in Sources */,
 				0DA686672E536CB4002A6651 /* _hcache_old_mt.c in Sources */,
 				0DA686682E536CB4002A6651 /* _hinput_mt.c in Sources */,
+				0D99CC8F2E9A611E005CC92A /* match_block.cpp in Sources */,
 				0D3D963E29FD3C1000B37681 /* match_in_new.cpp in Sources */,
 				D6EE50631F2A0AA3002854A2 /* compress_detect.cpp in Sources */,
 				D6BD9BAF17578491004886DE /* diff.cpp in Sources */,

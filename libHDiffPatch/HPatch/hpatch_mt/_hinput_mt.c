@@ -62,7 +62,7 @@ hpatch_BOOL _hinput_mt_init(hinput_mt_t* self,struct hpatch_mt_t* h_mt,hpatch_TW
     if (decompressPlugin)
         self->decompressHandle=decompressPlugin->open(decompressPlugin,uncompressedSize,
                                                       base_stream,curReadPos,endReadPos);
-    return (self->decompressPlugin==0)|(self->decompressHandle!=0);
+    return (self->decompressPlugin==0)||(self->decompressHandle!=0);
 }
 static void _hinput_mt_free(hinput_mt_t* self){
     if (self==0) return;
@@ -87,10 +87,10 @@ static hpatch_BOOL _hinput_mt_readAData(hinput_mt_t* self,hpatch_TWorkBuf* data)
 static void hinput_thread_(int threadIndex,void* workData){
     hinput_mt_t* self=(hinput_mt_t*)workData;
     hpatch_BOOL _isOnError=hpatch_FALSE;
-    while ((!hpatch_mt_isOnFinish(self->mt_base.h_mt))&(!_isOnError)&(self->curReadPos<self->base.streamSize)){
+    while ((!hpatch_mt_isOnFinish(self->mt_base.h_mt))&&(!_isOnError)&&(self->curReadPos<self->base.streamSize)){
         hpatch_TWorkBuf* wbuf=hpatch_mt_base_onceWaitABuf_(&self->mt_base,(hpatch_TWorkBuf**)&self->mt_base.freeBufList,&_isOnError);
         
-        if ((wbuf!=0)&(!_isOnError)){
+        if ((wbuf!=0)&&(!_isOnError)){
             if (_hinput_mt_readAData(self,wbuf)){
                 hpatch_mt_base_pushABufAtEnd_(&self->mt_base,(hpatch_TWorkBuf**)&self->mt_base.dataBufList,wbuf,&_isOnError);
             }else{
@@ -145,7 +145,7 @@ hpatch_BOOL hinput_mt_close(hpatch_TStreamInput* hinput_mt_stream){
     if (!self) return hpatch_TRUE;
     hinput_mt_stream->streamImport=0;
 
-    result=(!self->mt_base.isOnError)&(self->curOutedPos==self->base.streamSize);
+    result=(!self->mt_base.isOnError)&&(self->curOutedPos==self->base.streamSize);
     _hinput_mt_free(self);
     return result;
 }

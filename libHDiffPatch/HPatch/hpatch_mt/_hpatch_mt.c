@@ -195,11 +195,11 @@ hpatch_BOOL _hpatch_mt_base_init(hpatch_mt_base_t* self,struct hpatch_mt_t* h_mt
 
     self->_locker=c_locker_new();
     self->_waitCondvar=c_condvar_new();
-    if ((self->_waitCondvar!=0)&(self->h_mt!=0)){
+    if ((self->_waitCondvar!=0)&&(self->h_mt!=0)){
         if (!hpatch_mt_registeCondvar(self->h_mt,self->_waitCondvar))
             return hpatch_FALSE;
     }
-    return (self->_locker!=0)&(self->_waitCondvar!=0);
+    return (self->_locker!=0)&&(self->_waitCondvar!=0);
 }
 
 void _hpatch_mt_base_free(hpatch_mt_base_t* self){
@@ -209,7 +209,7 @@ void _hpatch_mt_base_free(hpatch_mt_base_t* self){
     assert(self->threadIsRunning==0);
     if (self->_locker) c_locker_leave(self->_locker);
 #endif 
-    if ((self->_waitCondvar!=0)&(self->h_mt!=0))
+    if ((self->_waitCondvar!=0)&&(self->h_mt!=0))
         hpatch_mt_unregisteCondvar(self->h_mt,self->_waitCondvar);
     _thread_obj_free(c_condvar_delete,self->_waitCondvar);
     _thread_obj_free(c_locker_delete,self->_locker);
@@ -224,7 +224,7 @@ void hpatch_mt_base_setOnError_(hpatch_mt_base_t* self){
         c_condvar_broadcast(self->_waitCondvar);
     }
     c_locker_leave(self->_locker);
-    if (isNeedSetOnError&(self->h_mt!=0))
+    if (isNeedSetOnError&&(self->h_mt!=0))
         hpatch_mt_setOnError(self->h_mt);
 }
 
@@ -232,7 +232,7 @@ hpatch_TWorkBuf* hpatch_mt_base_onceWaitABuf_(hpatch_mt_base_t* self,hpatch_TWor
     hpatch_TWorkBuf* wbuf=0;
     c_locker_enter(self->_locker);
     wbuf=TWorkBuf_popABuf(pBufList);
-    if ((wbuf==0)&(!self->isOnError)){
+    if ((wbuf==0)&&(!self->isOnError)){
         c_condvar_wait(self->_waitCondvar,self->_locker);
         wbuf=TWorkBuf_popABuf(pBufList);
     }
@@ -245,7 +245,7 @@ hpatch_TWorkBuf* hpatch_mt_base_onceWaitAllBufs_(hpatch_mt_base_t* self,hpatch_T
     hpatch_TWorkBuf* wbufs=0;
     c_locker_enter(self->_locker);
     wbufs=TWorkBuf_popAllBufs(pBufList);
-    if ((wbufs==0)&(!self->isOnError)){
+    if ((wbufs==0)&&(!self->isOnError)){
         c_condvar_wait(self->_waitCondvar,self->_locker);
         wbufs=TWorkBuf_popAllBufs(pBufList);
     }
@@ -279,7 +279,7 @@ hpatch_BOOL hpatch_mt_base_threadsBegin_(hpatch_mt_base_t* self,int threadCount,
     #if (defined(_DEBUG) || defined(DEBUG))
         ++self->threadIsRunning;
     #endif
-        if (!c_thread_parallel(1,threadProc,workData,(isUseThisThread!=0)&(i+1==threadCount),i+threadIndexOffset)){
+        if (!c_thread_parallel(1,threadProc,workData,(isUseThisThread!=0)&&(i+1==threadCount),i+threadIndexOffset)){
             if (self->h_mt) hpatch_mt_onThreadEnd(self->h_mt);
         #if (defined(_DEBUG) || defined(DEBUG))
             --self->threadIsRunning;

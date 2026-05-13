@@ -65,27 +65,19 @@ hpatch_BOOL hpatch_packUIntWithTag(TByte** out_code,TByte* out_code_end,
                                    const hpatch_uint kTagBit){//write out integer and advance pointer.
     TByte*          pcode=*out_code;
     const hpatch_StreamPos_t kMaxValueWithTag=((hpatch_StreamPos_t)1<<(7-kTagBit))-1;
-    TByte           codeBuf[hpatch_kMaxPackedUIntBytes];
-    TByte*          codeEnd=codeBuf;
+    size_t bCount=0;
+    assert((0<=kTagBit)&&(kTagBit<=7));
+    assert((highTag>>kTagBit)==0);
+    while ((uValue>>(7*bCount))>kMaxValueWithTag)
+        ++bCount;
 #ifdef __RUN_MEM_SAFE_CHECK
-    //static const hpatch_uint kPackMaxTagBit=7;
-    //assert((0<=kTagBit)&&(kTagBit<=kPackMaxTagBit));
-    //assert((highTag>>kTagBit)==0);
+    if ((size_t)(out_code_end-pcode)<(1+bCount)) return _hpatch_FALSE;
 #endif
-    while (uValue>kMaxValueWithTag) {
-        *codeEnd=uValue&((1<<7)-1); ++codeEnd;
-        uValue>>=7;
-    }
-#ifdef __RUN_MEM_SAFE_CHECK
-    if ((out_code_end-pcode)<(1+(codeEnd-codeBuf))) return _hpatch_FALSE;
-#endif
-    *pcode=(TByte)( (TByte)uValue | (highTag<<(8-kTagBit))
-                   | (((codeBuf!=codeEnd)?1:0)<<(7-kTagBit))  );
-    ++pcode;
-    while (codeBuf!=codeEnd) {
-        --codeEnd;
-        *pcode=(*codeEnd) | (TByte)(((codeBuf!=codeEnd)?1:0)<<7);
-        ++pcode;
+    *pcode++=(TByte)( (TByte)(uValue>>(7*bCount)) | (highTag<<(8-kTagBit))
+                   | (((bCount>0)?1:0)<<(7-kTagBit))  );
+    while (bCount>0) {
+        --bCount;
+        *pcode++=((uValue>>(7*bCount))&((1<<7)-1)) | (TByte)(((bCount>0)?1:0)<<7);
     }
     *out_code=pcode;
     return hpatch_TRUE;
@@ -690,7 +682,7 @@ hpatch_BOOL _TOutStreamCache_copyFromSelf(_TOutStreamCache* self,hpatch_StreamPo
     hpatch_StreamPos_t srcPos=self->writeToPos+self->cacheCur-aheadLength;
     if (src->read==0) //can't read
         return _hpatch_FALSE;
-    if ((aheadLength<1)|(aheadLength>self->writeToPos+self->cacheCur))
+    if ((aheadLength<1)||(aheadLength>self->writeToPos+self->cacheCur))
             return _hpatch_FALSE;
     
     if (srcPos+copyLength<=self->writeToPos){//copy from stream
@@ -1672,7 +1664,7 @@ static hpatch_BOOL _cache_old_load(const hpatch_TStreamInput*oldData,
     if (oldPos<kMinSpaceLen) oldPos=0;
     
     _arrayCovers_sort_by_old(arrayCovers);
-    while ((oldPos<oldPosAllEnd)&(cur_i<coverCount)) {
+    while ((oldPos<oldPosAllEnd)&&(cur_i<coverCount)) {
         hpatch_StreamPos_t oldPosEnd;
         hpatch_size_t readLen=(cache_buf_end-cache_buf);
         if (readLen>(oldPosAllEnd-oldPos)) readLen=(hpatch_size_t)(oldPosAllEnd-oldPos);
@@ -1711,7 +1703,7 @@ static hpatch_BOOL _cache_old_load(const hpatch_TStreamInput*oldData,
                     //assert(sumCacheLen>=copyLen);
                     memcpy(old_cache+(hpatch_size_t)dstPos,cache_buf+(from-oldPos),copyLen);
                     sumCacheLen-=copyLen;
-                    if ((i==cur_i)&(oldPosEnd>=ioldPosEnd))
+                    if ((i==cur_i)&&(oldPosEnd>=ioldPosEnd))
                         ++cur_i;
                 }else{//no more intersections with current data for following cover lines, move to next data block;
                 //  [oldPos     oldPosEnd]
@@ -1771,7 +1763,7 @@ static hpatch_BOOL _cache_old_StreamInput_read(const hpatch_TStreamInput* stream
         self->readFromPosEnd=oldPos+dataLen;
     }
     readLen=out_data_end-out_data;
-    if ((readLen>dataLen)|(self->readFromPos!=readFromPos)) return _hpatch_FALSE; //error
+    if ((readLen>dataLen)||(self->readFromPos!=readFromPos)) return _hpatch_FALSE; //error
     self->readFromPos=readFromPos+readLen;
     if (self->isInHitCache){
         assert(readLen<=(hpatch_size_t)(self->cachesEnd-self->caches));
@@ -2327,7 +2319,7 @@ static hpatch_BOOL _patch_step_cache_old_update(void* _self){
     self->cache_old.arrayCovers.cur_index=0;
     self->cache_old.cachesEnd=self->cache_buf_end-_kMemForReadOldSize; //limit covers + cached data 's size
     self->cache_old.maxCachedLen=_kMaxCachedLen_max;
-    while ((self->cache_old.maxCachedLen>=_step_cache_old_sumBufSize(self))&(self->cache_old.maxCachedLen>_kMaxCachedLen_min))
+    while ((self->cache_old.maxCachedLen>=_step_cache_old_sumBufSize(self))&&(self->cache_old.maxCachedLen>_kMaxCachedLen_min))
         self->cache_old.maxCachedLen/=2;
 
     //read some cover from self->covers to self->cache_old.arrayCovers
@@ -2479,7 +2471,7 @@ hpatch_BOOL patch_single_stream_diff(const hpatch_TStreamOutput*  out_newData,
                 _clip_unpackUIntTo(&bufCover_size,&inClip);
                 _clip_unpackUIntTo(&bufRle_size,&inClip);
                 #ifdef __RUN_MEM_SAFE_CHECK
-                    if ((bufCover_size>stepMemSize)|(bufRle_size>stepMemSize)|
+                    if ((bufCover_size>stepMemSize)||(bufRle_size>stepMemSize)||
                         (bufCover_size+bufRle_size>stepMemSize)) return _hpatch_FALSE;
                 #endif
                 covers_cacheEnd=step_cache+(size_t)bufCover_size;
@@ -2509,7 +2501,7 @@ hpatch_BOOL patch_single_stream_diff(const hpatch_TStreamOutput*  out_newData,
             --coverCount;
             if (covers.cover.length){
                 #ifdef __RUN_MEM_SAFE_CHECK
-                    if ((covers.cover.oldPos>oldData->streamSize)|
+                    if ((covers.cover.oldPos>oldData->streamSize)||
                         (covers.cover.length>(hpatch_StreamPos_t)(oldData->streamSize-covers.cover.oldPos))) return _hpatch_FALSE;
                 #endif
                 if (!_patch_add_old_with_rle0(&outCache,&rle0_decoder,oldData,covers.cover.oldPos,covers.cover.length,
@@ -2529,7 +2521,7 @@ hpatch_BOOL patch_single_stream_diff(const hpatch_TStreamOutput*  out_newData,
     
     if (!_TOutStreamCache_flush(&outCache))
         return _hpatch_FALSE;
-    if (_TStreamCacheClip_isFinish(&inClip)&_TOutStreamCache_isFinish(&outCache)&(coverCount==0))
+    if (_TStreamCacheClip_isFinish(&inClip)&&_TOutStreamCache_isFinish(&outCache)&&(coverCount==0))
         return hpatch_TRUE;
     else
         return _hpatch_FALSE;
@@ -2572,7 +2564,7 @@ static hpatch_BOOL _TDiffToSingleStream_read(const struct hpatch_TStreamInput* s
         }else{
             size_t cachedSize=_TDiffToSingleStream_kBufSize-self->cachedBufBegin;
             size_t bufSize=(size_t)(readedSize-readFromPos);
-            if ((readFromPos<readedSize)&(bufSize<=cachedSize)){
+            if ((readFromPos<readedSize)&&(bufSize<=cachedSize)){
                 if (rLen>bufSize)
                     rLen=bufSize;
                 memcpy(out_data,self->buf+(_TDiffToSingleStream_kBufSize-bufSize),rLen);

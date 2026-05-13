@@ -51,12 +51,12 @@ hpatch_BOOL clipCStrsTo(const char* cstrs,const char* cstrsEnd,
                         const char** out_cstrList,size_t cstrCount){
     if (cstrs<cstrsEnd){
         if (cstrsEnd[-1]!='\0') return hpatch_FALSE;
-        while ((cstrs<cstrsEnd)&(cstrCount>0)) {
+        while ((cstrs<cstrsEnd)&&(cstrCount>0)) {
             *out_cstrList=cstrs;  ++out_cstrList; --cstrCount;
             cstrs+=strlen(cstrs)+1; //safe
         }
     }
-    return (cstrs==cstrsEnd)&(cstrCount==0);
+    return (cstrs==cstrsEnd)&&(cstrCount==0);
 }
 
 hpatch_BOOL readListTo(TStreamCacheClip* sclip,hpatch_StreamPos_t* out_list,size_t count){

@@ -304,7 +304,7 @@ hpatch_BOOL getVcDiffInfo(hpatch_VcDiffInfo* out_diffinfo,const hpatch_TStreamIn
 #ifdef __RUN_MEM_SAFE_CHECK
     {
         const hpatch_StreamPos_t maxPos=_TStreamCacheClip_leaveSize(&diffClip);
-        if ( (out_diffinfo->appHeadDataLen>maxPos)|(out_diffinfo->windowOffset>maxPos) )
+        if ( (out_diffinfo->appHeadDataLen>maxPos)||(out_diffinfo->windowOffset>maxPos) )
             return _hpatch_FALSE; //data size error
     }
 #endif
@@ -416,7 +416,7 @@ static hpatch_BOOL __vcpatch_checksum_end_(vcpatch_checksum_t* self,_TOutStreamC
 }
 
 static hpatch_inline hpatch_BOOL vcpatch_checksum_begin(vcpatch_checksum_t* self,_TOutStreamCache* outCache){
-    if ((self)->isNeedChecksum&(self)->window_isHaveAdler32)
+    if ((self)->isNeedChecksum&&(self)->window_isHaveAdler32)
         return __vcpatch_checksum_begin_(self,outCache);
     else
         return hpatch_TRUE;
@@ -815,7 +815,7 @@ hpatch_BOOL _vcpatch_window(const hpatch_TStreamOutput* out_newData,const hpatch
                 {
                     hpatch_StreamPos_t streamSafeEnd=(srcData==oldData)?srcData->streamSize:outCache.writeToPos;
                     hpatch_StreamPos_t srcPosEnd=srcPos+srcLen;
-                    if ((srcPosEnd<srcPos)|(srcPosEnd<srcLen)|(srcPosEnd>streamSafeEnd))
+                    if ((srcPosEnd<srcPos)||(srcPosEnd<srcLen)||(srcPosEnd>streamSafeEnd))
                         return _hpatch_FALSE; //error data
                 }
 #endif
@@ -852,7 +852,7 @@ hpatch_BOOL _vcpatch_window(const hpatch_TStreamOutput* out_newData,const hpatch
         }
         {
             hpatch_BOOL       ret;
-            const hpatch_BOOL isInterleaved=((dataLen==0)&(addrLen==0));
+            const hpatch_BOOL isInterleaved=((dataLen==0)&&(addrLen==0));
             TStreamCacheClip  dataClip;
             TStreamCacheClip  instClip;
             TStreamCacheClip  addrClip;

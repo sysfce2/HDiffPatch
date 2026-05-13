@@ -77,12 +77,12 @@ static void hcache_old_thread_(int threadIndex,void* workData){
         if (!_isOnError){
             covers_cache=(unsigned char*)self->covers_cache;
             covers_cacheEnd=(unsigned char*)self->covers_cacheEnd;
-            _isGot_covers_cache=(covers_cache!=0)|(self->leaveCoverCount==0);
+            _isGot_covers_cache=(covers_cache!=0)||(self->leaveCoverCount==0);
             if (!_isGot_covers_cache){
                 c_condvar_wait(self->mt_base._waitCondvar,self->mt_base._locker);
                 covers_cache=(unsigned char*)self->covers_cache;
                 covers_cacheEnd=(unsigned char*)self->covers_cacheEnd;
-                _isGot_covers_cache=(covers_cache!=0)|(self->leaveCoverCount==0);
+                _isGot_covers_cache=(covers_cache!=0)||(self->leaveCoverCount==0);
             }
             if (_isGot_covers_cache){
                 self->covers_cache=0;
@@ -91,9 +91,9 @@ static void hcache_old_thread_(int threadIndex,void* workData){
         }
         c_locker_leave(self->mt_base._locker);
         if (_isOnError) break; //exit loop by error
-        if (_isGot_covers_cache&self->isOnStepCoversInThread&(self->nextCoverlistener!=0))
+        if (_isGot_covers_cache&&self->isOnStepCoversInThread&&(self->nextCoverlistener!=0))
             self->nextCoverlistener->onStepCovers(self->nextCoverlistener,covers_cache,covers_cacheEnd);
-        if (_isGot_covers_cache&(covers_cache==0)) break; //exit loop by all done
+        if (_isGot_covers_cache&&(covers_cache==0)) break; //exit loop by all done
         if (covers_cache==0) continue; //need covers_cache
         assert(_isGot_covers_cache);
 
@@ -155,7 +155,7 @@ static void _hcache_old_mt_onStepCovers(struct sspatch_coversListener_t* listene
     }
     c_condvar_signal(self->mt_base._waitCondvar);
     c_locker_leave(self->mt_base._locker);
-    if ((!self->isOnStepCoversInThread)&(self->nextCoverlistener!=0))
+    if ((!self->isOnStepCoversInThread)&&(self->nextCoverlistener!=0))
         self->nextCoverlistener->onStepCovers(self->nextCoverlistener,covers_cache,covers_cacheEnd);
 }
 static void _hcache_old_mt_onStepCoversReset(struct sspatch_coversListener_t* listener,hpatch_StreamPos_t leaveCoverCount){
@@ -234,8 +234,8 @@ hpatch_BOOL hcache_old_mt_close(hpatch_TStreamInput* hcache_old_mt_stream){
     if (!self) return hpatch_TRUE;
     hcache_old_mt_stream->streamImport=0;
 
-    result=(!self->mt_base.isOnError)&(self->curDataBuf==0)&(self->covers_cache==0)
-            &((self->leaveCoverCount==0)|(self->leaveCoverCount==~(hpatch_StreamPos_t)0));
+    result=(!self->mt_base.isOnError)&&(self->curDataBuf==0)&&(self->covers_cache==0)
+            &&((self->leaveCoverCount==0)||(self->leaveCoverCount==~(hpatch_StreamPos_t)0));
     _hcache_old_mt_free(self);
     return result;
 }

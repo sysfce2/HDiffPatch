@@ -42,6 +42,7 @@ struct TCompressedStream:public hpatch_TStreamOutput{
     inline bool  is_overLimit()const { return _is_overLimit; }
 private:
     const hpatch_TStreamOutput*  out_code;
+    const hpatch_StreamPos_t     out_beginPos;
     hpatch_StreamPos_t           out_pos;
     hpatch_StreamPos_t           out_posLimitEnd;
     hpatch_StreamPos_t           _writeToPos_back;
@@ -52,7 +53,7 @@ private:
 
 TCompressedStream::TCompressedStream(const hpatch_TStreamOutput*  _out_code,
                                      hpatch_StreamPos_t _writePos,hpatch_StreamPos_t _kLimitOutCodeSize)
-:out_code(_out_code),out_pos(_writePos),out_posLimitEnd(_writePos+_kLimitOutCodeSize),
+:out_code(_out_code),out_beginPos(_writePos),out_pos(_writePos),out_posLimitEnd(_writePos+_kLimitOutCodeSize),
 _writeToPos_back(0),_is_overLimit(false){
     this->streamImport=this;
     this->streamSize=0;
@@ -64,15 +65,23 @@ hpatch_BOOL TCompressedStream::_write_code(const hpatch_TStreamOutput* stream,hp
                                            const unsigned char* data,const unsigned char* data_end){
     assert(data<data_end);
     TCompressedStream* self=(TCompressedStream*)stream->streamImport;
-    checki(self->_writeToPos_back==writeToPos,"TCompressedStream::write() writeToPos error!");
     size_t dataLen=(size_t)(data_end-data);
-    self->_writeToPos_back=writeToPos+dataLen;
-    
-    if ((self->_is_overLimit)||(self->out_pos+dataLen>self->out_posLimitEnd)){
-        self->_is_overLimit=true;
+    if (writeToPos==self->_writeToPos_back){
+        // Sequential write
+        self->_writeToPos_back=writeToPos+dataLen;
+        if ((self->_is_overLimit)||(self->out_pos+dataLen>self->out_posLimitEnd)){
+            self->_is_overLimit=true;
+        }else{
+            if (!self->out_code->write(self->out_code,self->out_pos,data,data_end)) return hpatch_FALSE;
+            self->out_pos+=dataLen;
+        }
+    }else if (writeToPos<self->_writeToPos_back&&writeToPos+dataLen<=self->_writeToPos_back){
+        // Rewrite within already allocated range (e.g. tuz updates header fields like dictSize)
+        if (!self->_is_overLimit){
+            if (!self->out_code->write(self->out_code,self->out_beginPos+writeToPos,data,data_end)) return hpatch_FALSE;
+        }
     }else{
-        if (!self->out_code->write(self->out_code,self->out_pos,data,data_end)) return hpatch_FALSE;
-        self->out_pos+=dataLen;
+        checki(0,"TCompressedStream::write() writeToPos error!");
     }
     return hpatch_TRUE;
 }
@@ -780,7 +789,9 @@ hpatch_StreamPos_t TDiffStream::pushStream(const hpatch_TStreamInput* stream,
         TCompressedStream  out_stream(out_diff,writePos,kLimitOutCodeSize);
         compressed_size=compressPlugin->compress(compressPlugin,&out_stream,stream);
         if (out_stream.is_overLimit()||(compressed_size==0)||(compressed_size>kLimitOutCodeSize)){
-            check(!isMustCompress);
+            if (isMustCompress){
+                checki(0,"TDiffStream::pushStream() compress failed: maxCompressedSize() too small or compressPlugin returned 0 (must compress).");
+            }
             compressed_size=0;//NOTICE: compress is canceled
         }else{
             writePos+=compressed_size; //compress ok

@@ -229,7 +229,7 @@ hpatch_BOOL _TSyncDiffData_readOldPoss(TSyncDiffData* self,hpatch_StreamPos_t* o
     for (uint32_t i=0;i<kBlockCount; ++i){
         hpatch_StreamPos_t pos;
         if (!_syncDiffLocalPoss_nextOldPos(&localPoss,&pos)) return hpatch_FALSE;
-        if (isNeedSyncByOldPos(pos)|(pos<oldDataSize))
+        if (isNeedSyncByOldPos(pos)||(pos<oldDataSize))
             out_newBlockDataInOldPoss[i]=pos;
         else
             return hpatch_FALSE;

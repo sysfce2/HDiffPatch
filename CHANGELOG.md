@@ -2,6 +2,16 @@
 
 full changelog at: https://github.com/sisong/HDiffPatch/commits   
 
+## [v4.12.2](https://github.com/sisong/HDiffPatch/tree/v4.12.2) - 2026-03-09
+### Fixed
+*  Fixed the linking libhpatchz.a error in iOS & MacOS SDK;
+
+## [v4.12.1](https://github.com/sisong/HDiffPatch/tree/v4.12.1) - 2026-01-13
+### Added
+* support dir-diff & dir-patch on QNX OS; by contributor [xiongpan(Oshienai96)](https://github.com/Oshienai96);
+### Fixed
+* fix a bug when run dir-patch & dst-path same as old-path;
+
 ## [v4.12.0](https://github.com/sisong/HDiffPatch/tree/v4.12.0) - 2025-09-19
 ### Added
 * optimize `$hdiffz -m` required memory size when newData similar to oldData;
@@ -128,7 +138,7 @@ if diffFile created by empty oldPath, then extract with default option `$selfExt
 ## [v4.0.0](https://github.com/sisong/HDiffPatch/tree/v4.0.0) - 2021-06-14
 ### Added
 * cmdline add option "-SD", to create single compressed diffData, for optimize decompress buffer when patch, and support step by step patching when step by step downloading; it's better for IoT!  NOTE: old patcher can't work with this new format diffData. 
-* the added create_single_compressed_diff()&patch_single_stream() can be used;
+* the added create_single_compressed_diff()&&patch_single_stream() can be used;
 * add create_single_compressed_diff_stream(), same as create_single_compressed_diff(), but can control memory requires and run speed by different kMatchBlockSize value;
 * now, zstd plugin default added in cmdline;
 ### Changed
@@ -145,9 +155,9 @@ if diffFile created by empty oldPath, then extract with default option `$selfExt
 ## [v3.1.0](https://github.com/sisong/HDiffPatch/tree/v3.1.0) - 2020-12-16
 ### Added
 * add a memory cache for patch to newStream, can reduce write I/O times;
-* add create_single_compressed_diff()&patch_single_compressed_diff(), for v4.0, preview;
+* add create_single_compressed_diff()&&patch_single_compressed_diff(), for v4.0, preview;
 ### Removed
-* cmdline remove option "-o", no Original diff, you can continue to call patch()|patch_stream() by yourself;  
+* cmdline remove option "-o", no Original diff, you can continue to call patch()||patch_stream() by yourself;  
 * remove patch_decompress_repeat_out(), you need use patch_decompress*() to replace it;
 
 ## [v3.0.8](https://github.com/sisong/HDiffPatch/tree/v3.0.8) - 2020-01-01

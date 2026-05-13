@@ -137,7 +137,7 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
 #if (_MT_IS_NEED_LIMIT_SIZE)
     if (newSize<1*(1<<20)) mtsets.writeNew_isMT=0;
     if (oldSize<1*(1<<17)) mtsets.readOld_isMT=0;
-    if ((diffSize<(newSize+oldSize)/256)|(diffSize<(1<<17))) mtsets.readDiff_isMT=0;
+    if ((diffSize<(newSize+oldSize)/256)||(diffSize<(1<<17))) mtsets.readDiff_isMT=0;
 #endif
     if (decompressPlugin==0) mtsets.decompressDiff_isMT=0;
     if (mtsets.readOld_isMT){// is can cache all old?
@@ -196,7 +196,7 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
 #endif
         mtsets=*(hpatchMTSets_t*)disThreads;
     }
-    if ((decompressPlugin!=0)&(mtsets.readDiff_isMT!=0)&(!mtsets.decompressDiff_isMT)){
+    if ((decompressPlugin!=0)&&(mtsets.readDiff_isMT!=0)&&(!mtsets.decompressDiff_isMT)){
         mtsets.readDiff_isMT=0;
         mtsets.decompressDiff_isMT=1;
     }

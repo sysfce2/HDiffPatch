@@ -180,7 +180,7 @@ struct TOldStreamCache:public TBlockStreamCache{
                     return eq_len+i;
             }
             eq_len+=len;
-            if ((len==xLen)&(cacheSize<maxCacheSize))
+            if ((len==xLen)&&(cacheSize<maxCacheSize))
                 _doGrowCacheSize();
             if (!_loop_backward_cache(len,1)) break;
             if (!y._loop_backward_cache(len,1)) break;
@@ -215,7 +215,8 @@ struct TDigest_comp_i:public TDigest_comp{
     bool operator()(const TDigest& x,const TIndex& y)const { return (y+i<n)?(x.value<blocks[y+i]):false; }
     template<class TIndex> inline
     bool operator()(const TIndex& x, const TIndex& y)const {
-        if ((x+i<n)&(y+i<n)) return blocks[x+i]<blocks[y+i];
+        if ((x+i<n)&(y+i<n)) //for performance, '&' is used here instead of the more semantically appropriate '&&'.
+            return blocks[x+i]<blocks[y+i];
         if (x+i<n) return false;
         if (y+i<n) return true;
         return x>y;//n-x<n-y

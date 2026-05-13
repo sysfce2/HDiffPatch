@@ -266,7 +266,7 @@ TSyncClient_resultType _writeToNewOrDiff_by(_IWriteToNewOrDiff_by* wr_by,_TWrite
 
         {//write new
             bool isNeedChecksumAppend=isNeedSync|wd.isLocalPatch|(wd.continueDiffData!=0);
-            if (isNeedChecksumAppend|isOnNewDataContinue)
+            if (isNeedChecksumAppend||isOnNewDataContinue)
                 _checkSumNewDataBuf();
             if (newSyncInfo->fileChecksumPlugin&&
                  (newSyncInfo->isNotCChecksumNewMTParallel||isNeedChecksumAppend))
@@ -551,7 +551,7 @@ clear:
     };
     static const hpatch_StreamPos_t kEmptyEndPos=~(hpatch_StreamPos_t)0;
     static inline bool _isCanCombine(const _TValidRange& back_range,hpatch_StreamPos_t rangeBegin){
-        return ((rangeBegin>0)&(back_range.last+1==rangeBegin));
+        return ((rangeBegin>0)&&(back_range.last+1==rangeBegin));
     }
     static inline void _setRange(_TValidRange& next_ranges,hpatch_StreamPos_t rangeBegin,hpatch_StreamPos_t rangeEnd){
         assert(rangeBegin<rangeEnd);

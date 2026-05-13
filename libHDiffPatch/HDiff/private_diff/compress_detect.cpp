@@ -44,7 +44,7 @@ namespace hdiff_private{
             size_t i0=i; ++i;
             while ((i<n)&&(v==(is_sub_on?(unsigned char)(d[i]-sub[i]):d[i])))
                 ++i;
-            if ((v==0)|(v==255)){
+            if ((v==0)||(v==255)){
                 ++cost;
             }else{
                 cost+=(i-i0<=1)?1:2;
