@@ -41,18 +41,18 @@ hpatch_BOOL a_to_u64(const char* pnum,size_t slen,hpatch_uint64_t* out_size){
     const hpatch_uint64_t _kSizeMaxMod10=_kU64Max-_kSizeMaxDiv10*10;
     hpatch_uint64_t v=0;
     size_t s;
-    if (slen==0) return hpatch_FALSE;
-    if ((slen>=2)&(pnum[0]=='0')) return hpatch_FALSE;
+    if ((slen==0)|((slen>=2)&(pnum[0]=='0'))) //for performance, '| &' is used here instead of the more semantically appropriate '|| &&'.
+        return hpatch_FALSE;
     for (s=0; s<slen; ++s) {
         hpatch_uint64_t c=pnum[s];
-        if (('0'<=c)&(c<='9'))
+        if (('0'<=c)&(c<='9')) //for performance, '&' is used here instead of the more semantically appropriate '&&'.
             ;//empty ok
         else
             return hpatch_FALSE;
         c-='0';
         if (v<_kSizeMaxDiv10)
             ;//empty ok
-        else if ((v>_kSizeMaxDiv10)|(c>_kSizeMaxMod10))
+        else if ((v>_kSizeMaxDiv10)|(c>_kSizeMaxMod10)) //for performance, '|' is used here instead of the more semantically appropriate '|'.
             return hpatch_FALSE;
         v=v*10+c;
     }

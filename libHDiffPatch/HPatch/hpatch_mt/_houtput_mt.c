@@ -71,7 +71,7 @@ hpatch_BOOL _houtput_mt_writeAData(houtput_mt_t* self,hpatch_TWorkBuf* data){
 static void houtput_thread_(int threadIndex,void* workData){
     houtput_mt_t* self=(houtput_mt_t*)workData;
     hpatch_BOOL _isOnError=hpatch_FALSE;
-    while ((!hpatch_mt_isOnError(self->mt_base.h_mt))&(!_isOnError)&(self->curWritePos<self->base.streamSize)){
+    while ((!hpatch_mt_isOnError(self->mt_base.h_mt))&&(!_isOnError)&&(self->curWritePos<self->base.streamSize)){
         hpatch_TWorkBuf* datas=hpatch_mt_base_onceWaitAllBufs_(&self->mt_base,(hpatch_TWorkBuf**)&self->mt_base.dataBufList,&_isOnError);
         
         while (datas){
@@ -98,7 +98,7 @@ static hpatch_BOOL houtput_mt_write_(const struct hpatch_TStreamOutput* stream,h
     if (self->curOutedPos!=writeToPos) return hpatch_FALSE;
     self->curOutedPos+=(data_end-data);
     if (self->curOutedPos>self->base.streamSize) return hpatch_FALSE;
-    while ((!_isOnError)&(data<data_end)){
+    while ((!_isOnError)&&(data<data_end)){
         if (hpatch_mt_isOnError(self->mt_base.h_mt)) { _isOnError=hpatch_TRUE; break; }
         if (self->curDataBuf==0){
             self->curDataBuf=hpatch_mt_base_onceWaitABuf_(&self->mt_base,(hpatch_TWorkBuf**)&self->mt_base.freeBufList,&_isOnError);
@@ -106,13 +106,13 @@ static hpatch_BOOL houtput_mt_write_(const struct hpatch_TStreamOutput* stream,h
                 self->curDataBuf->data_size=0;
         }
 
-        if ((self->curDataBuf!=0)&(!_isOnError)){
+        if ((self->curDataBuf!=0)&&(!_isOnError)){
             size_t writeLen=self->mt_base.workBufSize-self->curDataBuf->data_size;
             writeLen=(writeLen<(size_t)(data_end-data))?writeLen:(size_t)(data_end-data);
             memcpy(TWorkBuf_data_end(self->curDataBuf),data,writeLen);
             self->curDataBuf->data_size+=writeLen;
             data+=writeLen;
-            if ((self->mt_base.workBufSize==self->curDataBuf->data_size)|((data==data_end)&isNeedFlush)){
+            if ((self->mt_base.workBufSize==self->curDataBuf->data_size)||((data==data_end)&&isNeedFlush)){
                 hpatch_mt_base_pushABufAtEnd_(&self->mt_base,(hpatch_TWorkBuf**)&self->mt_base.dataBufList,self->curDataBuf,&_isOnError);
                 self->curDataBuf=0;
             }
@@ -150,7 +150,7 @@ hpatch_BOOL houtput_mt_close(hpatch_TStreamOutput* houtput_mt_stream){
     if (!self) return hpatch_TRUE;
     houtput_mt_stream->streamImport=0;
 
-    result=(!self->mt_base.isOnError)&(self->curWritePos==self->base.streamSize);
+    result=(!self->mt_base.isOnError)&&(self->curWritePos==self->base.streamSize);
     _houtput_mt_free(self);
     return result;
 }

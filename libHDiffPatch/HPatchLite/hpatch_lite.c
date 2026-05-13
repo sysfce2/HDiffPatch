@@ -123,12 +123,12 @@ hpi_BOOL hpatch_lite_open(hpi_TInputStreamHandle diff_data,hpi_TInputStream_read
     _CHECK(read_diff(diff_data,buf,&lenn));
     //HPatchLite type tag 2byte, version code(high 2bit)
     lenu=buf[3];
-    _SAFE_CHECK((lenn==hpi_kHeadSize)&(buf[0]=='h')&(buf[1]=='I')&((lenu>>6)==kHPatchLite_versionCode));
+    _SAFE_CHECK((lenn==hpi_kHeadSize)&(buf[0]=='h')&(buf[1]=='I')&((lenu>>6)==kHPatchLite_versionCode)); //for performance, '&' is used here instead of the more semantically appropriate '&&'.
     *out_compress_type=buf[2]; //compress type
     lenn=lenu&7; //newSize bytes(low 3bit)
     lenu=(lenu>>3)&7; //uncompressSize bytes(mid 3bit)
 
-    _SAFE_CHECK((lenn<=sizeof(hpi_pos_t))&(lenu<=sizeof(hpi_pos_t)));
+    _SAFE_CHECK((lenn<=sizeof(hpi_pos_t))&(lenu<=sizeof(hpi_pos_t))); //for performance, '&' is used here instead of the more semantically appropriate '&&'.
     _CHECK(read_diff(diff_data,buf,&lenn));
     *out_newSize=_hpi_readSize(buf,lenn);
     _CHECK(read_diff(diff_data,buf,&lenu));
@@ -180,7 +180,7 @@ hpi_BOOL hpatch_lite_patch(hpatchi_listener_t* listener,hpi_pos_t newSize,
         _CHECK(_patch_add_old_withClip(listener,&diff,isNotNeedSubDiff,cover_oldPos,cover_length,temp_cache));
         newPosBack=cover_newPos+cover_length;
         oldPosBack=cover_oldPos+cover_length;
-        _SAFE_CHECK((cover_length>0)|(coverCount==0));
+        _SAFE_CHECK((cover_length>0)|(coverCount==0)); //for performance, '|' is used here instead of the more semantically appropriate '||'.
     }
     return (newSize==newPosBack)&_cache_success_finish(&diff);
 }
@@ -200,13 +200,13 @@ hpi_BOOL hpatchi_inplace_open(hpi_TInputStreamHandle diff_data,hpi_TInputStream_
     _CHECK(read_diff(diff_data,buf,&lenn));
     //HPatchLite type tag 2byte, version code(high 2bit)
     lenu=buf[3];
-    _SAFE_CHECK((lenn==hpi_kInplaceHeadSize)&(buf[0]=='h')&(buf[1]=='I')&((lenu>>6)==kHPatchLite_inplaceCode));
+    _SAFE_CHECK((lenn==hpi_kInplaceHeadSize)&(buf[0]=='h')&(buf[1]=='I')&((lenu>>6)==kHPatchLite_inplaceCode)); //for performance, '&' is used here instead of the more semantically appropriate '&&'.
     *out_compress_type=buf[2]; //compress type
     lenn=lenu&7; //newSize bytes(low 3bit)
     lenu=(lenu>>3)&7; //uncompressSize bytes(mid 3bit)
     lene=buf[4];
 
-    _SAFE_CHECK((lenn<=sizeof(hpi_pos_t))&(lenu<=sizeof(hpi_pos_t))&(lene<=sizeof(hpi_size_t)));
+    _SAFE_CHECK((lenn<=sizeof(hpi_pos_t))&(lenu<=sizeof(hpi_pos_t))&(lene<=sizeof(hpi_size_t))); //for performance, '&' is used here instead of the more semantically appropriate '&&'.
     _CHECK(read_diff(diff_data,buf,&lenn));
     *out_newSize=_hpi_readSize(buf,lenn);
     _CHECK(read_diff(diff_data,buf,&lenu));

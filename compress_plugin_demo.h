@@ -172,7 +172,7 @@ int _default_setParallelThreadNumber(hdiff_TCompress* compressPlugin,int threadN
         if (!self) return result;
         if (self->c_stream.state!=0){
             int ret=deflateEnd(&self->c_stream);
-            result=(Z_OK==ret)|(Z_DATA_ERROR==ret);
+            result=(Z_OK==ret)||(Z_DATA_ERROR==ret);
         }
         memset(self,0,sizeof(_zlib_TCompress));
         return result;
@@ -188,7 +188,7 @@ int _default_setParallelThreadNumber(hdiff_TCompress* compressPlugin,int threadN
         self->c_stream.next_in=(Bytef*)part_data;
         self->c_stream.avail_in=(uInt)(part_data_end-part_data);
         while (1) {
-            if ((self->c_stream.avail_out<self->c_buf_size)|is_stream_end){
+            if ((self->c_stream.avail_out<self->c_buf_size)||is_stream_end){
                 size_t writeLen=self->c_buf_size-self->c_stream.avail_out;
                 if (writeLen>0){
                     _stream_out_code_write(self->out_code,*outStream_isCanceled,
@@ -282,7 +282,7 @@ int _default_setParallelThreadNumber(hdiff_TCompress* compressPlugin,int threadN
         if (!stream) return;
         if (stream->state!=0){
             int ret=deflateEnd(stream);
-            assert((Z_OK==ret)|(Z_DATA_ERROR==ret));
+            assert((Z_OK==ret)||(Z_DATA_ERROR==ret));
         }
         free(stream);
     }
@@ -578,7 +578,7 @@ int _default_setParallelThreadNumber(hdiff_TCompress* compressPlugin,int threadN
         if (BZ_OK!=BZ2_bzCompressInit(&s,plugin->compress_level, 0, 0))
             _compress_error_return("BZ2_bzCompressInit()");
         while (1) {
-            if ((s.avail_out<kCompressBufSize)|is_stream_end){
+            if ((s.avail_out<kCompressBufSize)||is_stream_end){
                 size_t writeLen=kCompressBufSize-s.avail_out;
                 if (writeLen>0){
                     _stream_out_code_write(out_code,outStream_isCanceled,result,code_buf,writeLen);

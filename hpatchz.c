@@ -1209,11 +1209,11 @@ static TByte* getPatchMemCache(hpatch_BOOL isLoadOldAll,size_t patchCacheSize,si
     } hpatch_TProgressStreamOutput;
     static void _progressStreamOutput_updateProgress(hpatch_TProgressStreamOutput* self,hpatch_StreamPos_t curPos){
         unsigned int progress=(unsigned int)((curPos*self->progressR)*1000+0.5);
-        progress=((progress<1000)&(((curPos<self->base.streamSize))))?progress:1000;
+        progress=((progress<1000)&&(((curPos<self->base.streamSize))))?progress:1000;
         if (progress!=self->progress){
             double time1=clock_s();
             hpatch_BOOL isEnd=(progress==1000);
-            if ((time1>=self->time0+1.0/3)|isEnd){
+            if ((time1>=self->time0+1.0/3)||isEnd){
                 const char* progressStr="=============================="; //strlen==30
                 self->progress=progress;
                 self->time0=time1;

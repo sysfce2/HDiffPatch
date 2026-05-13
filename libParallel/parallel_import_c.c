@@ -26,6 +26,7 @@
  */
 #include "parallel_import_c.h"
 
+#if (_IS_USED_MULTITHREAD)
 #if (_IS_USED_PTHREAD)
 #   include <pthread.h>
 #   if ((defined _WIN32)||(defined WIN32))
@@ -366,7 +367,7 @@ struct c_channel_t* c_channel_new(void* pmem,size_t memSize,size_t maxChanDataCo
     self->_acceptCond=c_condvar_new();
     self->_dataList=(TChanData*)(self+1);
     self->_maxDataCount=maxChanDataCount;
-    if ((self->_locker==0)|(self->_sendCond==0)|(self->_acceptCond==0))
+    if ((self->_locker==0)||(self->_sendCond==0)||(self->_acceptCond==0))
         goto _on_error;
 
     return self;
@@ -444,7 +445,7 @@ c_mt_bool_t c_channel_send(struct c_channel_t* self,TChanData data,c_mt_bool_t i
         c_locker_enter(self->_locker);
         while (1) {
             if (self->_isClosed) break;
-            if ((self->_curDataCount<self->_maxDataCount)||((self->_maxDataCount==0)&(self->_curDataCount==0))) {
+            if ((self->_curDataCount<self->_maxDataCount)||((self->_maxDataCount==0)&&(self->_curDataCount==0))) {
                 _dataList_push_back(self,data);
                 c_condvar_signal(self->_acceptCond);
                 result=c_mt_bool_TRUE; //ok
@@ -494,4 +495,5 @@ TChanData c_channel_accept(struct c_channel_t* self,c_mt_bool_t isWait){
     return result;
 }
 
+#endif //_IS_USED_MULTITHREAD
 

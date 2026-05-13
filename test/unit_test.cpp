@@ -506,7 +506,7 @@ struct TPatchiListener:public hpatchi_listener_t{
     static hpi_BOOL _read_old(struct hpatchi_listener_t* listener,hpi_pos_t read_from_pos,hpi_byte* out_data,hpi_size_t data_size){
         TPatchiListener& self=*(TPatchiListener*)listener;
         size_t dsize=self.oldData_end-self.oldData;
-        if ((read_from_pos>dsize)|(data_size>(size_t)(dsize-read_from_pos))) return hpi_FALSE;
+        if ((read_from_pos>dsize)||(data_size>(size_t)(dsize-read_from_pos))) return hpi_FALSE;
         memcpy(out_data,self.oldData+(size_t)read_from_pos,data_size);
         return hpi_TRUE;
     }
