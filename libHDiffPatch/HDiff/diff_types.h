@@ -54,6 +54,12 @@ namespace hdiff_private{
             else
                 return x.length<y.length;
         }
+        inline bool operator ()(const TCover& x,const hpatch_StreamPos_t y_newPos){
+            return x.newPos<y_newPos;
+        }
+        inline bool operator ()(const hpatch_StreamPos_t x_newPos,const TCover& y){
+            return x_newPos<y.newPos;
+        }
     };
     template<class TCover>
     struct cover_cmp_by_old_t{
@@ -62,6 +68,12 @@ namespace hdiff_private{
                 return x.oldPos<y.oldPos;
             else
                 return x.length<y.length;
+        }
+        inline bool operator ()(const TCover& x,const hpatch_StreamPos_t y_oldPos){
+            return x.oldPos<y_oldPos;
+        }
+        inline bool operator ()(const hpatch_StreamPos_t x_oldPos,const TCover& y){
+            return x_oldPos<y.oldPos;
         }
     };
     template<class TCover>

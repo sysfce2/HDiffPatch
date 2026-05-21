@@ -350,8 +350,8 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
     typedef struct{
         hpatch_StreamPos_t  oldPos;
         hpatch_StreamPos_t  newPos;
-        hpatch_size_t       oldLength;
-        hpatch_size_t       newLength;
+        hpatch_StreamPos_t  oldLength;
+        hpatch_StreamPos_t  newLength;
     } hpatch_TWindow;
 
 
