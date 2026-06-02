@@ -2,7 +2,7 @@
 //
 /*
  The MIT License (MIT)
- Copyright (c) 2025 HouSisong
+ Copyright (c) 2025-2026 HouSisong
  
  Permission is hereby granted, free of charge, to any person
  obtaining a copy of this software and associated documentation
@@ -34,7 +34,7 @@ namespace hdiff_private{
 class TWindowMatcher{
 public:
     TWindowMatcher(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,size_t newWindowSize,
-                   size_t oldWindowSize,size_t kBigCoverSize,std::vector<TCover>& covers,size_t threadNum);
+                   size_t oldWindowSize,size_t kBigCoverSize,std::vector<TCover>& covers);
     void search_windows(std::vector<hpatch_TWindow>& out_windows);
     ~TWindowMatcher();
 private:
@@ -47,7 +47,6 @@ private:
     const size_t                m_oldWindowSize;
     const size_t                m_kBigCoverSize;
     std::vector<TCover>&        m_covers;
-    const size_t                m_threadNum;
 };
 
 void getBigCoversInWindows(std::vector<std::vector<TCover> >& out_bigCoverss,const std::vector<TCover>& covers,

@@ -2028,8 +2028,8 @@ void get_match_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamIn
                                     false,mtsets->threadNum,true);
     }
     //*/
-    TWindowMatcher windowMatcher(newData->streamSize,oldData->streamSize,kNewWindowSize,kOldWindowSize,
-                                 kBigCoverSize,covers,mtsets->threadNum);
+    TWindowMatcher windowMatcher(newData->streamSize,oldData->streamSize,
+                                 kNewWindowSize,kOldWindowSize,kBigCoverSize,covers);
     windowMatcher.search_windows(out_windows);
     getBigCoversInWindows(out_bigCoverss,covers,out_windows,kBigCoverSize);
 }

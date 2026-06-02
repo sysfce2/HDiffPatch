@@ -1,7 +1,7 @@
 //window_matcher.cpp
 /*
  The MIT License (MIT)
- Copyright (c) 2025 HouSisong
+ Copyright (c) 2025-2026 HouSisong
  
  Permission is hereby granted, free of charge, to any person
  obtaining a copy of this software and associated documentation
@@ -24,6 +24,7 @@
  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  OTHER DEALINGS IN THE SOFTWARE.
  */
+//#include "to_pic.cpp"
 
 #include "window_matcher.h"
 #include "covers_range.h"
@@ -113,18 +114,16 @@ void getWindowBoxByCovers(hpatch_TWindow& out_window,const std::vector<TCover>& 
 
     static void _extenPos(hpatch_StreamPos_t& pos,hpatch_StreamPos_t& length,size_t windowSize,
                           hpatch_StreamPos_t limitPos,hpatch_StreamPos_t limitPosEnd){
-        static size_t kExtenPosSize = 1024*4;
+        static const size_t kExtenPosSize = 1024*2;
         hpatch_StreamPos_t posEnd=pos+length;
-        assert((windowSize>=length)&&(pos>=limitPos)&&(posEnd<=limitPosEnd));
+        assert((length<=windowSize)&&(pos>=limitPos)&&(posEnd<=limitPosEnd));
         size_t extenLen=(windowSize-(size_t)length)>>1;
-        if (extenLen){
-            extenLen=(extenLen<kExtenPosSize)?extenLen:kExtenPosSize;
-            pos=(pos<extenLen)?0:pos-extenLen;
-            pos=(pos>limitPos)?pos:limitPos;
-            posEnd+=extenLen;
-            posEnd=(posEnd<limitPosEnd)?posEnd:limitPosEnd;
-            length=posEnd-pos;
-        }
+        extenLen=(extenLen<kExtenPosSize)?extenLen:kExtenPosSize;
+        pos=(pos<extenLen)?0:pos-extenLen;
+        pos=(pos>limitPos)?pos:limitPos;
+        posEnd+=extenLen;
+        posEnd=(posEnd<limitPosEnd)?posEnd:limitPosEnd;
+        length=posEnd-pos;
     }
 void extenWindowsForMatch(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,
                           hpatch_StreamPos_t oldSize,size_t newWindowSize,size_t oldWindowSize){
@@ -142,23 +141,25 @@ void extenWindowsForMatch(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_
 }
 
     struct TWindowCmpByNewPos{
-        inline bool operator()(const hpatch_TWindow& a,const hpatch_TWindow& b)const{
-                                return a.newPos < b.newPos; }
+        inline bool operator()(const TCoversRange& a,const TCoversRange& b)const{
+                                return a.window.newPos < b.window.newPos; }
     };
 void rangesToWindows(std::vector<hpatch_TWindow>& out_windows,const std::vector<TCoversRange>& cvRanges){
+    out_windows.clear();
     out_windows.reserve(cvRanges.size());
     for (size_t i=0;i<cvRanges.size();i++){
         const hpatch_TWindow& window=cvRanges[i].window;
         if (window.oldLength>0)
             out_windows.push_back(window);
     }
-    std::sort(out_windows.begin(),out_windows.end(),TWindowCmpByNewPos());
 }
 
-static void _check_windows_safe(const std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize){
+static void _check_windows_safe(const std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,
+                                size_t newWindowSize,size_t oldWindowSize){
     hpatch_StreamPos_t newPosEndBck=0;
     for (size_t i=0;i<windows.size();++i){
         const hpatch_TWindow& window=windows[i];
+        check((window.newLength<=newWindowSize)&&(window.oldLength<=oldWindowSize));    
         check((window.newLength>0)&&(window.oldLength>0));
         check(window.newPos+window.newLength<=newSize);
         check(window.oldPos+window.oldLength<=oldSize);
@@ -171,9 +172,10 @@ TWindowMatcher::~TWindowMatcher(){
 }
 
 TWindowMatcher::TWindowMatcher(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,size_t newWindowSize,
-                               size_t oldWindowSize,size_t kBigCoverSize,std::vector<TCover>& covers,size_t threadNum)
+                               size_t oldWindowSize,size_t kBigCoverSize,std::vector<TCover>& covers)
 :m_newSize(newSize),m_oldSize(oldSize),m_newWindowSize(newWindowSize),m_oldWindowSize(oldWindowSize),
- m_kBigCoverSize(kBigCoverSize),m_covers(covers),m_threadNum((threadNum>0)?threadNum:1){
+ m_kBigCoverSize(kBigCoverSize),m_covers(covers){
+    hpatch_StreamPos_t maxSplitLen=(newWindowSize<oldWindowSize)?newWindowSize:oldWindowSize;
 }
 
 void TWindowMatcher::search_windows(std::vector<hpatch_TWindow>& out_windows){
@@ -181,25 +183,15 @@ void TWindowMatcher::search_windows(std::vector<hpatch_TWindow>& out_windows){
     out_windows.clear();
     if (m_covers.empty()) return;
 
-    TCoversRange::TClipData tempData(m_newWindowSize,m_oldWindowSize,m_kBigCoverSize);
-    std::vector<TCoversRange> cvRanges;
-    cvRanges.reserve(1+(m_newSize/m_newWindowSize));
-    cvRanges.push_back(TCoversRange(m_covers.data(),m_covers.data()+m_covers.size(),tempData));
+    std::vector<unsigned char> coverValids(m_covers.size());
+    std::vector<TCoversRange>  cvRanges;
+    clipRangeByOld(cvRanges,oldWindowSize,m_covers.data(),m_covers.data()+m_covers.size(),coverValids.data());
+    //rangesToWindows(out_windows,cvRanges);
+    //_check_windows_safe(out_windows,m_newSize,m_oldSize,m_newSize,m_oldWindowSize);
 
-    size_t curRangei=0;
-    while (curRangei<cvRanges.size()){
-        TCoversRange& cvRange=cvRanges[curRangei];
-        TCoversRange cvRangeRight=cvRange;
-        if (cvRange.clipRangeTo(cvRangeRight,tempData)){
-            if (cvRangeRight.window.oldLength>0)
-                cvRanges.push_back(cvRangeRight);
-        }else{
-            ++curRangei;
-        }
-    }
-
+    clipRangeByNew(cvRanges,newWindowSize);
     rangesToWindows(out_windows,cvRanges);
-    _check_windows_safe(out_windows,m_newSize,m_oldSize);
+    _check_windows_safe(out_windows,m_newSize,m_oldSize,m_newWindowSize,m_oldWindowSize);
 }
 
 

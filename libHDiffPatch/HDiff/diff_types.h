@@ -54,6 +54,9 @@ namespace hdiff_private{
             else
                 return x.length<y.length;
         }
+        inline bool operator ()(const TCover* x,const TCover* y){
+            return operator ()(*x,*y);
+        }
         inline bool operator ()(const TCover& x,const hpatch_StreamPos_t y_newPos){
             return x.newPos<y_newPos;
         }
@@ -68,6 +71,9 @@ namespace hdiff_private{
                 return x.oldPos<y.oldPos;
             else
                 return x.length<y.length;
+        }
+        inline bool operator ()(const TCover* x,const TCover* y){
+            return operator ()(*x,*y);
         }
         inline bool operator ()(const TCover& x,const hpatch_StreamPos_t y_oldPos){
             return x.oldPos<y_oldPos;
