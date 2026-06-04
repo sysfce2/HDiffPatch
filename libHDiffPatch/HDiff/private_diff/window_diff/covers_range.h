@@ -2,7 +2,7 @@
 //
 /*
  The MIT License (MIT)
- Copyright (c) 2025 HouSisong
+ Copyright (c) 2025-2026 HouSisong
  
  Permission is hereby granted, free of charge, to any person
  obtaining a copy of this software and associated documentation
@@ -28,30 +28,33 @@
 #ifndef covers_range_h
 #define covers_range_h
 #include "../../diff_types.h"
-#include "../mem_buf.h"
+#include <string.h>
 namespace hdiff_private{
 
 struct TCoversRange{
-    struct TClipData{
-        const size_t newWindowSize;
-        const size_t oldWindowSize;
-        const size_t kBigCoverSize;
-
-        //todo: some temp datas
-        inline TClipData(size_t _newWindowSize,size_t _oldWindowSize,size_t _kBigCoverSize)
-        :newWindowSize(_newWindowSize),oldWindowSize(_oldWindowSize),kBigCoverSize(_kBigCoverSize){}
-    };
-
-    TCover*   cover_begin;
-    TCover*   cover_end;
-    uint64_t        cost;
-    hpatch_TWindow  window; //limited by newWindowSize & oldWindowSize
-    inline explicit TCoversRange(TCover* _cover_begin,TCover* _cover_end,TClipData& tempData)
-     :cover_begin(_cover_begin),cover_end(_cover_end){  }
-    inline size_t coverCount()const{ return cover_end-cover_begin; }
-    bool clipRangeTo(TCoversRange& rangeRight,TClipData& tempData);
-private:
+    //TCoversRange
+    const TCover*       cover_begin;
+    const TCover*       cover_end;
+    unsigned char*      coverValid_begin;  //validity flag per cover: 1=valid,0=invalid
+    hpatch_TWindow      window;
+	inline TCoversRange(){ memset(this,0,sizeof(*this)); }
+    inline explicit TCoversRange(const TCover* _cover_begin,const TCover* _cover_end)
+     :cover_begin(_cover_begin),cover_end(_cover_end),coverValid_begin(0)
+      { memset(&window,0,sizeof(window)); }
+    inline explicit TCoversRange(const TCover* _cover_begin,const TCover* _cover_end,unsigned char* _coverValid_begin)
+     :cover_begin(_cover_begin),cover_end(_cover_end),coverValid_begin(_coverValid_begin)
+      { memset(&window,0,sizeof(window)); }
+    inline TCoversRange(const TCoversRange& b) { *this=b; }
+    inline bool operator < (const TCoversRange& b)const { return cover_begin < b.cover_begin; }
 };
+
+
+//clip by oldWindowSize
+void clipRangeByOld(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,
+                    const TCover* cover,const TCover* cover_end,unsigned char* valid);
+
+//clip by newWindowSize
+void clipRangeByNew(std::vector<TCoversRange>& ranges,size_t newWindowSize);
 
 }//namespace hdiff_private
 
