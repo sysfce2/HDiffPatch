@@ -215,8 +215,126 @@ static const TCover* _get_best_clip(const TCover* cover,const TCover* cover_end,
         _update_window(range.window,range.cover_begin,range.cover_end,range.coverValid_begin);
     }
 
-static void _merge_nearby_ranges(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize){
-    const hpatch_StreamPos_t kMaxGap=oldWindowSize/3;
+    
+    static const hpatch_uint64_t kExtendCostScale=1024;
+    static const hpatch_uint64_t kExtendMaxCost_defaut=kExtendCostScale*4;
+    static const hpatch_uint64_t kExtendMaxCost_max=kExtendCostScale*8;
+
+    static inline hpatch_StreamPos_t _old_gap(const TCover* c,const hpatch_TWindow& window){
+        hpatch_StreamPos_t cOldEnd=_y_end(c);
+        if (cOldEnd<=window.oldPos)
+            return window.oldPos-cOldEnd;
+        if (c->oldPos>=window.oldPos+window.oldLength)
+            return c->oldPos-(window.oldPos+window.oldLength);
+        return 0;
+    }
+    static inline hpatch_uint64_t _cover_cost(const TCover* c,const hpatch_TWindow& window){
+        hpatch_StreamPos_t gap=_old_gap(c,window);
+        return (gap*kExtendCostScale)/c->length;
+    }
+    static bool _can_fit_cover(const TCover* c,const hpatch_TWindow& window,
+                               hpatch_StreamPos_t oldWindowSize){
+        hpatch_StreamPos_t newOldPos=std::min(window.oldPos,c->oldPos);
+        hpatch_StreamPos_t newOldEnd=std::max(window.oldPos+window.oldLength,_y_end(c));
+        return (newOldEnd-newOldPos)<=oldWindowSize;
+    }
+    static hpatch_StreamPos_t _cover_score(const TCover* c,const hpatch_TWindow& window,
+                                           hpatch_StreamPos_t oldWindowSize){
+        if (!_can_fit_cover(c,window,oldWindowSize)) return 0;
+        hpatch_StreamPos_t overlapBegin=std::max(c->oldPos,window.oldPos);
+        hpatch_StreamPos_t overlapEnd=std::min(_y_end(c),window.oldPos+window.oldLength);
+        hpatch_StreamPos_t overlap=(overlapEnd>overlapBegin)?(overlapEnd-overlapBegin):0;
+        if (overlap==c->length)
+            return c->length;
+        else if (overlap>0)
+            return overlap+(c->length-overlap)/2;
+        else{
+            hpatch_StreamPos_t gap=_old_gap(c,window);
+            hpatch_StreamPos_t clampedGap=std::min(gap,oldWindowSize);
+            hpatch_StreamPos_t score_factor=4*oldWindowSize-3*clampedGap;
+            return (hpatch_uint64_t)c->length*score_factor/(8*oldWindowSize);
+        }
+    }
+
+static void _get_better_clip(TCoversRange& range_a,TCoversRange& range_b,const TCover* firstValid,const TCover* endValid,
+                             hpatch_StreamPos_t oldWindowSize,const TCover* cover,unsigned char* valid,
+                             std::vector<hpatch_StreamPos_t>& score_a,std::vector<hpatch_StreamPos_t>& score_b,
+                             std::vector<hpatch_uint64_t>& prefix_a,std::vector<hpatch_uint64_t>& suffix_b){
+    const size_t N=endValid-firstValid;
+    if (N==0) return;
+    score_a.resize(N);
+    score_b.resize(N);
+    for (size_t k=0;k<N;k++){
+        const TCover* c=firstValid+k;
+        score_a[k]=_cover_score(c,range_a.window,oldWindowSize);
+        score_b[k]=_cover_score(c,range_b.window,oldWindowSize);
+    }
+    prefix_a.resize(N+1);
+    suffix_b.resize(N+1);
+    prefix_a[0]=0;
+    for (size_t k=0;k<N;k++)
+        prefix_a[k+1]=prefix_a[k]+score_a[k];
+    suffix_b[N]=0;
+    for (size_t k=N;k>0;k--)
+        suffix_b[k-1]=suffix_b[k]+score_b[k-1];
+    hpatch_uint64_t best_score=0;
+    size_t best_k=0;
+    for (size_t k=0;k<=N;k++){
+        hpatch_uint64_t total=prefix_a[k]+suffix_b[k];
+        if (total>best_score){
+            best_score=total;
+            best_k=k;
+        }
+    }
+    const TCover* best_split=firstValid+best_k;
+    if (best_split==range_a.cover_end) return;
+    range_a.cover_end=best_split;
+    range_b.cover_begin=best_split;
+    range_b.coverValid_begin=valid+(best_split-cover);
+}
+
+static void _clip_edge_ranges(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,
+                                const TCover* cover,unsigned char* valid){
+    std::vector<hpatch_StreamPos_t> temp_score_a,temp_score_b;
+    std::vector<hpatch_uint64_t>    temp_prefix_a,temp_suffix_b;
+    for (size_t i=1;i<ranges.size();i++){
+        const TCover* firstValid=ranges[i-1].cover_end;
+        while ((firstValid>ranges[i-1].cover_begin)&&(!valid[firstValid-1-cover]))
+            --firstValid;
+        const TCover* endValid=ranges[i].cover_begin;
+        while ((endValid<ranges[i].cover_end)&&(!valid[endValid-cover]))
+            ++endValid;
+        if (firstValid==endValid)
+            continue;
+        _get_better_clip(ranges[i-1],ranges[i],firstValid,endValid,oldWindowSize,cover,valid,
+                         temp_score_a,temp_score_b,temp_prefix_a,temp_suffix_b);
+    }
+}
+
+static void _extend_interior_ranges(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,
+                                    const TCover* cover,unsigned char* valid,hpatch_StreamPos_t kExtendMaxCost){
+    for (size_t i=0;i<ranges.size();i++){
+        while (true){
+            TCoversRange& range=ranges[i];
+            bool rangeChanged=false;
+            for (const TCover* c=range.cover_begin;c<range.cover_end;++c){
+                size_t idx=c-cover;
+                if (valid[idx]) continue;
+                if (!_can_fit_cover(c,range.window,oldWindowSize)) continue;
+                hpatch_uint64_t cost=_cover_cost(c,range.window);
+                if (cost<=kExtendMaxCost){
+                    valid[idx]=1;
+                    _update_window(range);
+                    rangeChanged=true;
+                }
+            }
+            if (!rangeChanged)
+                break;
+        }
+    }
+}
+
+static void _merge_nearby_ranges(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,hpatch_StreamPos_t kMaxGap){
     for (size_t i=1;i<ranges.size();i++){
         TCoversRange& a=ranges[i-1];
         TCoversRange& b=ranges[i];
@@ -228,6 +346,7 @@ static void _merge_nearby_ranges(std::vector<TCoversRange>& ranges,hpatch_Stream
         hpatch_StreamPos_t merged_oldLength=merged_oldEnd-merged_oldPos;
         hpatch_StreamPos_t ab_length=(a.window.oldLength+b.window.oldLength);
         hpatch_StreamPos_t gap=(merged_oldLength>ab_length)?(merged_oldLength-ab_length):0;
+
         if ((gap<=kMaxGap)&&(merged_oldLength<=oldWindowSize)){
             b.cover_begin=a.cover_begin;
             b.coverValid_begin=a.coverValid_begin;
@@ -264,7 +383,13 @@ void clipRangeByOld(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWind
         }
     }
 
-    _merge_nearby_ranges(ranges,oldWindowSize);
+    _clip_edge_ranges(ranges,oldWindowSize,cover,valid);
+    _extend_interior_ranges(ranges,oldWindowSize,cover,valid,kExtendMaxCost_defaut);
+ 
+    _merge_nearby_ranges(ranges,oldWindowSize,oldWindowSize*2/4);
+
+    _clip_edge_ranges(ranges,oldWindowSize,cover,valid);
+    _extend_interior_ranges(ranges,oldWindowSize,cover,valid,kExtendMaxCost_max);
 }
 
 
