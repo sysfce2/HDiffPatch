@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <algorithm>
 #include <stdlib.h>
+#include <stdexcept>  //std::runtime_error
 namespace hdiff_private{
 
 template<class T>
@@ -63,8 +64,7 @@ template<class T>
     static const TCover* _get_best_clip(const TCover* cover,const TCover* cover_end,
                                         hpatch_StreamPos_t windowSize,std::vector<Tz>& zs);
 static void _get_best_clips(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t windowSize,
-                            const TCover* cover,const TCover* cover_end){
-    const hpatch_StreamPos_t kSegSize=windowSize/3;
+                            const TCover* cover,const TCover* cover_end,hpatch_StreamPos_t kSegSize){
     
     ranges.clear();
     ranges.reserve(_x_size(cover,cover_end)/kSegSize+1);
@@ -366,20 +366,26 @@ static void _merge_nearby_ranges(std::vector<TCoversRange>& ranges,hpatch_Stream
 }
 
 void clipRangeByOld(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,
-                    const TCover* cover,const TCover* cover_end,unsigned char* valid){
-    _get_best_clips(ranges,oldWindowSize,cover,cover_end);
+                    const TCover* cover,const TCover* cover_end,unsigned char* valid,hpatch_StreamPos_t kSegSize){
+    _get_best_clips(ranges,oldWindowSize,cover,cover_end,kSegSize);
     const hpatch_StreamPos_t kMaxNewPos=_x_end(cover_end-1);
 
     {
         std::vector<Tz> zs;
         for (size_t i=0;i<ranges.size();i++){
-            const hpatch_StreamPos_t R=_R(ranges[i],oldWindowSize);
+            hpatch_StreamPos_t R=_R(ranges[i],oldWindowSize);
             size_t _best_zi=_get_best_z(zs,ranges[i].cover_begin,ranges[i].cover_end,R,kMaxNewPos);
             hpatch_StreamPos_t best_z=zs[_best_zi].z;
             ranges[i].coverValid_begin=valid+(ranges[i].cover_begin-cover);
-            _get_valid_by_z(ranges[i].coverValid_begin,ranges[i].cover_begin,ranges[i].cover_end,
-                            best_z,R,kMaxNewPos);
-            _update_window(ranges[i]);
+            while(true){
+                _get_valid_by_z(ranges[i].coverValid_begin,ranges[i].cover_begin,ranges[i].cover_end,
+                                best_z,R,kMaxNewPos);
+                _update_window(ranges[i]);
+                if (ranges[i].window.oldLength<=oldWindowSize) break;
+                //kSegSize too large?
+                R=(R>6)?(R+1)/2:R-1;
+                if (R==0) throw std::runtime_error("kSegSize error!");
+            }
         }
     }
 

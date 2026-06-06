@@ -51,7 +51,7 @@ struct TCoversRange{
 
 //clip by oldWindowSize
 void clipRangeByOld(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t oldWindowSize,
-                    const TCover* cover,const TCover* cover_end,unsigned char* valid);
+                    const TCover* cover,const TCover* cover_end,unsigned char* valid,hpatch_StreamPos_t kSegSize);
 
 //clip by newWindowSize
 void clipRangeByNew(std::vector<TCoversRange>& ranges,size_t newWindowSize);

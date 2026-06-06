@@ -34,7 +34,7 @@ namespace hdiff_private{
 class TWindowMatcher{
 public:
     TWindowMatcher(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,size_t newWindowSize,
-                   size_t oldWindowSize,size_t kBigCoverSize,std::vector<TCover>& covers);
+                   size_t oldWindowSize,size_t kSegSize,std::vector<TCover>& covers);
     void search_windows(std::vector<hpatch_TWindow>& out_windows);
     ~TWindowMatcher();
 private:
@@ -45,7 +45,7 @@ private:
     const hpatch_StreamPos_t    m_oldSize;
     const size_t                m_newWindowSize;
     const size_t                m_oldWindowSize;
-    const size_t                m_kBigCoverSize;
+    const size_t                m_kSegSize;
     std::vector<TCover>&        m_covers;
 };
 
@@ -57,8 +57,8 @@ void updateCoversPosIntoWindows(std::vector<TCover>& covers,const hpatch_TWindow
 void getWindowBoxByCovers(hpatch_TWindow& out_window,const std::vector<TCover>& covers);
 
 //try increasing the window size to slightly increase the chance of a match.
-void extenWindowsForMatch(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,
-                          hpatch_StreamPos_t oldSize,size_t newWindowSize,size_t oldWindowSize);
+void extenWindowsForMatch(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,
+                          size_t newWindowSize,size_t oldWindowSize,size_t kExtenPosSize);
 
 }//namespace hdiff_private
 #endif
