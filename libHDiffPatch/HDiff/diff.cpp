@@ -2038,8 +2038,8 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
         std::vector<TCover> covers;
         for (size_t i = 0; i < windows.size(); ++i) {
             covers.clear();
-            get_match_covers_in_a_window(newData, oldData, windows[i], bigCoverss[i], covers,
-                                         kMinSingleMatchScore, isUseBigCacheMatch,
+            get_match_covers_in_a_window(newData, oldData, windows[i], bigCoverss[i], covers,kMinSingleMatchScore,
+                                         false,//not use big cache match for similar data
                                          mtsets->threadNum,isExtendCover);
             if (windows[i].oldLength > 0) {
                 windows[insertWi++] = windows[i];
@@ -2078,15 +2078,25 @@ void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatc
         return;
     }
 
-    //todo: fast pack by bigCovers, like get_match_covers_by_stream_and_sstring  
     TAutoMem mem;
     loadOldAndNewStream(mem,oldData,window.oldPos,window.oldLength,
                         newData,window.newPos,window.newLength);
     unsigned char* pOldData=mem.data();
     unsigned char* pNewData=pOldData+window.oldLength;
-    get_match_covers_by_sstring(pNewData,pNewData+window.newLength,pOldData,pOldData+window.oldLength,
-                                out_covers,kMinSingleMatchScore,isUseBigCacheMatch,threadNum,isExtendCover,0);
-    updateCoversPosIntoWindows(out_covers,window); //data pos to window pos
+    if (!bigCovers.empty()) {
+        std::vector<TCover> relBigCovers=bigCovers;
+        updateCoversPosIntoWindows(relBigCovers,window);
+        TCoversOptimMem_blockCovers coversOp(pNewData,pNewData+window.newLength,pOldData,pOldData+window.oldLength,
+                                             relBigCovers,threadNum);
+        get_match_covers_by_sstring(coversOp.matchBlock->newData,coversOp.matchBlock->newData_end_cur,
+                                    coversOp.matchBlock->oldData,coversOp.matchBlock->oldData_end_cur,
+                                    out_covers,kMinSingleMatchScore,isUseBigCacheMatch,
+                                    threadNum,isExtendCover,&coversOp);
+    }else{
+        get_match_covers_by_sstring(pNewData,pNewData+window.newLength,pOldData,pOldData+window.oldLength,
+                                    out_covers,kMinSingleMatchScore,isUseBigCacheMatch,threadNum,isExtendCover,0);
+    }
+    updateCoversPosFromWindows(out_covers,window); //window pos to data pos 
     getWindowBoxByCovers(window,out_covers);//update window
 }
 

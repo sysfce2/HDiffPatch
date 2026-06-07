@@ -36,6 +36,7 @@ namespace hdiff_private{
         typedef hpatch_TCover TPackedCover;
         TMatchBlockBase(size_t _matchBlockSize,size_t _threadNum)
         :matchBlockSize(_matchBlockSize),threadNum(_threadNum){}
+		inline void swapBlockCovers(std::vector<TCover>& _blockCovers){ blockCovers.swap(_blockCovers); }
     protected:
         void _getPackedCover(hpatch_StreamPos_t newDataSize,hpatch_StreamPos_t oldDataSize);
         void _unpackData(IDiffInsertCover* diffi,hpatch_TCover*& pcovers,size_t& coverCount);
@@ -124,11 +125,6 @@ namespace hdiff_private{
                 *oldSize=self->matchBlock->curOldDataSize();
             }
         }
-        inline void _doPack(){
-            matchBlock->getBlockCovers();
-            matchBlock->getPackedCover();
-            matchBlock->packData();
-        }
     };
 
     struct TCoversOptimMem:public TCoversOptim<TMatchBlockMem>{
@@ -137,7 +133,9 @@ namespace hdiff_private{
                        size_t matchBlockSize,size_t threadNum)
         :TCoversOptim<TMatchBlockMem>(&_matchBlock),
          _matchBlock(newData,newData_end,oldData,oldData_end,matchBlockSize,threadNum){
-            _doPack();
+            matchBlock->getBlockCovers();
+            matchBlock->getPackedCover();
+            matchBlock->packData();
         }
     protected:
         TMatchBlockMem _matchBlock;
@@ -148,13 +146,29 @@ namespace hdiff_private{
                        size_t matchBlockSize,size_t threadNumForMem,size_t threadNumForStream)
         :TCoversOptim<TMatchBlockStream>(&_matchBlock),
          _matchBlock(newStream,oldStream,matchBlockSize,threadNumForMem,threadNumForStream){
-            _doPack();
+            matchBlock->getBlockCovers();
+            matchBlock->getPackedCover();
+            matchBlock->packData();
         }
         inline void cachedStreams(const hpatch_TStreamInput** pnewData,const hpatch_TStreamInput** poldData){
             _matchBlock.cachedStreams(pnewData,poldData);
         }
     protected:
         TMatchBlockStream _matchBlock;
+    };
+    
+    struct TCoversOptimMem_blockCovers:public TCoversOptim<TMatchBlockMem>{
+        TCoversOptimMem_blockCovers(unsigned char* newData,unsigned char* newData_end,
+                                    unsigned char* oldData,unsigned char* oldData_end,
+                                    std::vector<TCover>& _blockCovers,size_t threadNum)
+        :TCoversOptim<TMatchBlockMem>(&_matchBlock),
+         _matchBlock(newData,newData_end,oldData,oldData_end,0,threadNum){
+            matchBlock->swapBlockCovers(_blockCovers);//got blockCovers
+            matchBlock->getPackedCover();
+            matchBlock->packData();
+        }
+    protected:
+        TMatchBlockMem _matchBlock;
     };
 
 } //namespace hdiff_private

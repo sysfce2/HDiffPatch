@@ -97,7 +97,7 @@ void create_compressed_diff_stream(const hpatch_TStreamInput*  newData,
 static const size_t kDefaultFastMatchBlockSize = 1024 * 1;
 
 static const size_t kMatchWindowsBlockSize_default = (1<<6);
-static const size_t kDefaultBigCoverSize = 1024*8;
+static const size_t kDefaultBigCoverSize = 1024*16;
 static const size_t kDefaultWindowOldSize = 1024*256;
 
 //create a compressed diff data by window mode:

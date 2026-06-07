@@ -74,6 +74,17 @@ void getBigCoversInWindows(std::vector<std::vector<TCover> >& out_bigCoverss,con
 void updateCoversPosIntoWindows(std::vector<TCover>& covers,const hpatch_TWindow& window){
     for (size_t i=0;i<covers.size();++i){
         TCover& cover=covers[i];
+        check(cover.oldPos>=window.oldPos);
+        check(cover.newPos>=window.newPos);
+        cover.oldPos-=window.oldPos;
+        cover.newPos-=window.newPos;
+        check(cover.oldPos+cover.length<=window.oldLength);
+        check(cover.newPos+cover.length<=window.newLength);
+    }
+}
+void updateCoversPosFromWindows(std::vector<TCover>& covers,const hpatch_TWindow& window){
+    for (size_t i=0;i<covers.size();++i){
+        TCover& cover=covers[i];
         check(cover.oldPos+cover.length<=window.oldLength);
         check(cover.newPos+cover.length<=window.newLength);
         cover.oldPos+=window.oldPos;

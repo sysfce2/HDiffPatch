@@ -53,6 +53,7 @@ void getBigCoversInWindows(std::vector<std::vector<TCover> >& out_bigCoverss,con
                            const std::vector<hpatch_TWindow>& windows,size_t kBigCoverSize);
 
 void updateCoversPosIntoWindows(std::vector<TCover>& covers,const hpatch_TWindow& window);
+void updateCoversPosFromWindows(std::vector<TCover>& covers,const hpatch_TWindow& window);
 
 void getWindowBoxByCovers(hpatch_TWindow& out_window,const std::vector<TCover>& covers);
 
