@@ -553,6 +553,22 @@ void create_vcdiff_stream(const hpatch_TStreamInput* newData,const hpatch_TStrea
 }
 
 
+void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
+                          size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
+                          size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,
+                          int kMinSingleMatchScore,bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    std::vector<TCover> covers;
+    const bool isExtendCover=false;
+    //todo: get_match_covers_and_window + serialize_vcdiff with windows?
+    get_match_covers_by_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,covers,
+                               kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
+                               isUseBigCacheMatch,mtsets,isExtendCover);
+    _clipCovers(covers,kNewWindowSize);
+    serialize_vcdiff(newData,oldData,covers,out_diff,compressPlugin,kNewWindowSize);
+}
+
+
 void create_vcdiff_block(hpatch_byte* newData,hpatch_byte* newData_end,
                          hpatch_byte* oldData,hpatch_byte* oldData_end,
                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,

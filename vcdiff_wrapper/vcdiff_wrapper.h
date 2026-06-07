@@ -87,4 +87,12 @@ void create_vcdiff_block(const hpatch_TStreamInput* newData,const hpatch_TStream
                          int kMinSingleMatchScore=kMinSingleMatchScore_default,
                          bool isUseBigCacheMatch=false,const hdiff_TMTSets_s* mtsets=0);
 
+// create diffFile by window mode
+void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin=0,
+                          size_t kNewWindowSize=kDefaultWindowOldSize/2,size_t kOldWindowSize=kDefaultWindowOldSize,size_t kSegSize=0,
+                          size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
+                          size_t fastMatchBlockSize=kDefaultFastMatchBlockSize,int kMinSingleMatchScore=kMinSingleMatchScore_default,
+                          bool isUseBigCacheMatch=false,const hdiff_TMTSets_s* mtsets=0);
+
 #endif

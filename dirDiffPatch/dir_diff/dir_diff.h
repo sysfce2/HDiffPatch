@@ -40,6 +40,12 @@ struct THDiffSets{
     size_t matchBlockSize;
     size_t threadNum;
     size_t threadNumSearch_s;
+    //window diff mode
+    hpatch_BOOL isWindowDiffMode;
+    size_t windowOldSize;
+    size_t windowNewSize;
+    size_t windowSegSize;
+    size_t bigCoverSize;
 };
 
 #if (_IS_NEED_DIR_DIFF_PATCH)

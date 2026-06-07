@@ -313,6 +313,22 @@ void create_bsdiff_stream(const hpatch_TStreamInput* newData,const hpatch_TStrea
 }
 
 
+void create_bsdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
+                          bool isEndsleyBsdiff,size_t kOldWindowSize,size_t kSegSize,
+                          size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,
+                          int kMinSingleMatchScore,bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    const size_t kNewWindowSize = ~(size_t)0;
+    std::vector<TCover> covers;
+    const bool isExtendCover=true;
+    get_match_covers_by_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,covers,
+                               kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
+                               isUseBigCacheMatch,mtsets,isExtendCover);
+    _to_bsdiff_covers(covers,newData->streamSize);
+    serialize_bsdiff(newData,oldData,covers,out_diff,compressPlugin,isEndsleyBsdiff,isExtendCover);
+}
+
+
 void create_bsdiff_block(unsigned char* newData,unsigned char* newData_end,
                          unsigned char* oldData,unsigned char* oldData_end,
                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,

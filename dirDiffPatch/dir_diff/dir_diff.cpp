@@ -487,7 +487,13 @@ void dir_diff(IDirDiffListener* listener,const TManifest& oldManifest,
         const hdiff_TMTSets_s mtsets={hdiffSets.threadNum,hdiffSets.threadNumSearch_s,false,false};
         TOffsetStreamOutput ofStream(outDiffStream,writeToPos);
         if (hdiffSets.isSingleCompressedDiff){
-            if (hdiffSets.isDiffInMem)
+            if (hdiffSets.isWindowDiffMode)
+                create_single_compressed_diff_window(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
+                                                     hdiffSets.patchStepMemSize, hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                                                     hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                                                     (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                                                     hdiffSets.isUseBigCacheMatch,&mtsets);
+            else if (hdiffSets.isDiffInMem)
                 create_single_compressed_diff_block(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
                                                     hdiffSets.patchStepMemSize,hdiffSets.matchBlockSize,
                                                     (int)hdiffSets.matchScore,hdiffSets.isUseBigCacheMatch,&mtsets);
@@ -496,7 +502,13 @@ void dir_diff(IDirDiffListener* listener,const TManifest& oldManifest,
                                                      compressPlugin,hdiffSets.patchStepMemSize,
                                                      hdiffSets.matchBlockSize,&mtsets);
         }else{
-            if (hdiffSets.isDiffInMem)
+            if (hdiffSets.isWindowDiffMode)
+                create_compressed_diff_window(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
+                                              hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                                              hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                                              (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                                              hdiffSets.isUseBigCacheMatch,&mtsets);
+            else if (hdiffSets.isDiffInMem)
                 create_compressed_diff_block(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
                                              hdiffSets.matchBlockSize,(int)hdiffSets.matchScore,
                                              hdiffSets.isUseBigCacheMatch,&mtsets);

@@ -66,4 +66,13 @@ void create_bsdiff_block(const hpatch_TStreamInput* newData,const hpatch_TStream
                          int kMinSingleMatchScore=kMinSingleMatchScore_default,
                          bool isUseBigCacheMatch=false,const hdiff_TMTSets_s* mtsets=0);
 
+// create diffFile by window mode
+void create_bsdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin=0,
+                          bool isEndsleyBsdiff=false,
+                          size_t kOldWindowSize=kDefaultWindowOldSize,size_t kSegSize=0,
+                          size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
+                          size_t fastMatchBlockSize=kDefaultFastMatchBlockSize,int kMinSingleMatchScore=kMinSingleMatchScore_default,
+                          bool isUseBigCacheMatch=false,const hdiff_TMTSets_s* mtsets=0);
+
 #endif
