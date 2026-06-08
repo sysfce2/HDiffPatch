@@ -17,6 +17,8 @@
 		0D571A72275CF75B00672D57 /* hdiffz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D571A71275CF75B00672D57 /* hdiffz.cpp */; };
 		0D7FEAB8283124A20029772D /* hpatch_lite.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D7FEAB5283124A20029772D /* hpatch_lite.c */; };
 		0D8721112E7B856C008E97DB /* md5.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D8721102E7B856C008E97DB /* md5.c */; };
+		0D99CCB32FD6CDD1005CC92A /* window_matcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCB12FD6C873005CC92A /* window_matcher.cpp */; };
+		0D99CCB42FD6CDD1005CC92A /* covers_range.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCB22FD6C873005CC92A /* covers_range.cpp */; };
 		0DA2A8EE292B9880000E86E1 /* vcdiff_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0DA2A8E9292B9880000E86E1 /* vcdiff_wrapper.cpp */; };
 		0DA2A8EF292B9880000E86E1 /* vcpatch_wrapper.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA2A8EB292B9880000E86E1 /* vcpatch_wrapper.c */; };
 		0DA6865F2E536C50002A6651 /* _hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686542E536A3C002A6651 /* _hpatch_mt.c */; };
@@ -500,6 +502,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0D99CCB32FD6CDD1005CC92A /* window_matcher.cpp in Sources */,
+				0D99CCB42FD6CDD1005CC92A /* covers_range.cpp in Sources */,
 				0DA6865F2E536C50002A6651 /* _hpatch_mt.c in Sources */,
 				0DA686602E536C50002A6651 /* hpatch_mt.c in Sources */,
 				0DA686612E536C50002A6651 /* _houtput_mt.c in Sources */,

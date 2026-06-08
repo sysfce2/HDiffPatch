@@ -1690,7 +1690,7 @@ int hdiff(const char* oldFileName,const char* newFileName,const char* outDiffFil
             printf("create VCDIFF diffData!\n");
 #endif
         if (diffSets.isWindowDiffMode)
-            _out_diff_info("  opened window diff mode (windowOldSize: %" PRIu64 ")\n", (uint64_t)diffSets.windowOldSize);
+            _out_diff_info("  opened window diff mode (windowOldSize: %" PRIu64 ")\n", (hpatch_uint64_t)diffSets.windowOldSize);
     }
     
     int exitCode=hdiff_by_stream(oldFileName,newFileName,outDiffFileName,

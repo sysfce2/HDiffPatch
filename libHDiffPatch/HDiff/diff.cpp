@@ -1990,7 +1990,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
 
   {
     int saved_out_diff_info=_hdiff_is_out_diff_info;
-    _out_diff_info("  sub window diff loop ... (windowCount: %" PRIu64 ")\n",(uint64_t)windows.size());
+    _out_diff_info("  sub window diff loop ... (windowCount: %" PRIu64 ")\n",(hpatch_uint64_t)windows.size());
     _hdiff_is_out_diff_info=0;
 #if (_IS_USED_MULTITHREAD)
     size_t threadNum = mtsets->threadNum;

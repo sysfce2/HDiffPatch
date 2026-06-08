@@ -30,7 +30,7 @@ void bz_internal_error(int errcode){
         #define _kPatchCacheSize_min  (1024*256)
         #define _kPatchCacheSize_max  (((size_t)1)<<((sizeof(size_t)>4)?32:30))
         if (cacheMemory<=_kPatchCacheSize_min) return _kPatchCacheSize_min;
-        return (size_t)(((uint64_t)cacheMemory<_kPatchCacheSize_max)?cacheMemory:_kPatchCacheSize_max);
+        return (size_t)(((hpatch_uint64_t)cacheMemory<_kPatchCacheSize_max)?cacheMemory:_kPatchCacheSize_max);
     }
 
 int hpatchz(const char *oldFileName,const char *diffFileName,

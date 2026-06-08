@@ -42,7 +42,7 @@ using namespace hdiff_private;
 static const char* kDirDiffVersionType= "HDIFF19";
 
 static std::string  cmp_hash_type    =  "fadler64";
-#define cmp_hash_value_t                uint64_t
+#define cmp_hash_value_t                hpatch_uint64_t
 #define cmp_hash_begin(ph)              { (*(ph))=ADLER_INITIAL; }
 #define cmp_hash_append(ph,pvalues,n)   { (*(ph))=fast_adler64_append(*(ph),pvalues,n); }
 #define cmp_hash_end(ph)                {}
@@ -262,7 +262,7 @@ struct CChecksumCombine:public CChecksum{
             }
         }
     }
-    inline void combine(cmp_hash_value_t rightHash,uint64_t rightLen){
+    inline void combine(cmp_hash_value_t rightHash,hpatch_uint64_t rightLen){
         cmp_hash_combine(&_combineHash,rightHash,rightLen);
     }
     const bool              _isCanUseCombine;
