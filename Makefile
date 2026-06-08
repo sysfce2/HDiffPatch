@@ -230,6 +230,8 @@ HDIFF_OBJ += \
     libHDiffPatch/HDiff/private_diff/limit_mem_diff/stream_serialize.o \
     libHDiffPatch/HDiff/private_diff/libdivsufsort/divsufsort64.o \
     libHDiffPatch/HDiff/private_diff/libdivsufsort/divsufsort.o \
+    libHDiffPatch/HDiff/private_diff/window_diff/window_matcher.o \
+    libHDiffPatch/HDiff/private_diff/window_diff/covers_range.o \
     dirDiffPatch/dir_diff/dir_diff_tools.o \
     $(HPATCH_OBJ)
 ifeq ($(DIR_DIFF),0)

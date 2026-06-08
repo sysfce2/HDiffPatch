@@ -1988,6 +1988,10 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
     const size_t kExtenPosSize=std::max((size_t)2048,std::min(kNewWindowSize,kOldWindowSize)/16);
     extenWindowsForMatch(windows,newData->streamSize,oldData->streamSize,kNewWindowSize,kOldWindowSize,kExtenPosSize);
 
+  {
+    int saved_out_diff_info=_hdiff_is_out_diff_info;
+    _out_diff_info("  sub window diff loop ... (windowCount: %" PRIu64 ")\n",(uint64_t)windows.size());
+    _hdiff_is_out_diff_info=0;
 #if (_IS_USED_MULTITHREAD)
     size_t threadNum = mtsets->threadNum;
 #else
@@ -2055,6 +2059,8 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
         if (windows.size() > 1)
             collate_covers(out_covers,isCollateMergeCover);
     }
+    _hdiff_is_out_diff_info = saved_out_diff_info;
+  }
 }
 
 void get_match_windows_from_baseCovers(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,

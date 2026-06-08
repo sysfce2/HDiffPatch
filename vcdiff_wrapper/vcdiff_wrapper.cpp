@@ -570,7 +570,7 @@ static void serialize_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TSt
         targetPos+=targetLen;
     }
     assert(coveri==covers.size());
-    assert(targetPos==targetPosEnd);
+    assert(targetPos==newData->streamSize);
     serialize_vcdiff_windows(newData,oldData,covers,matchWindows,out_diff,compressPlugin,kMaxTargetWindowsSize);
 }
 

@@ -187,10 +187,10 @@ static void printUsage(){
            "      if newData not similar to oldData then diff speed++,\n"
            "      big cache max used O(oldFileSize) memory, and build slow(diff speed--)\n" 
            "  -w[-oldSize-segSize]\n"
-           "      diff by window; optimize the access speed of old data when patch;\n"
-           "        in -m mode, the patch size may increase, while in -s mode, the patch size may be smaller.\n"
+           "      diff by window; optimize the access of old data when patch;\n"
+           "        in -m mode, the patch size may slight increase, while in -s mode, the patch size may be smaller.\n"
            "      oldSize: max window bytes on old data, DEFAULT -w-512k; examples: -w-4m-1m, -w-16m;\n"
-           "      segSize: initial data granularity during window matching, DEFAULT oldSize/16;\n"
+           "      segSize: initial data granularity during window matching, segSize<oldSize, DEFAULT oldSize/16;\n"
            "  -SD[-stepSize]\n"
            "      create single compressed diffData, only need one decompress buffer\n"
            "      when patch, and support step by step patching when step by step downloading!\n"
@@ -218,7 +218,8 @@ static void printUsage(){
            "      create diffFile compatible with VCDIFF, unsupport input directory(folder).\n"
            "      out format same as $open-vcdiff ... or $xdelta3 -S -e -n ...\n"
 #   endif
-           "      NOTE: out diffFile used large source window size!\n"
+           "      NOTE: default out diffFile used large source window size! \n"
+           "        need used -w[-oldSize-segSize-newSize] to set source/segment/target window size.\n"
 #endif
 #if (_IS_USED_MULTITHREAD)
            "  -p-parallelThreadNumber\n"
@@ -1688,6 +1689,8 @@ int hdiff(const char* oldFileName,const char* newFileName,const char* outDiffFil
         if (diffSets.isVcDiff)
             printf("create VCDIFF diffData!\n");
 #endif
+        if (diffSets.isWindowDiffMode)
+            _out_diff_info("  opened window diff mode (windowOldSize: %" PRIu64 ")\n", (uint64_t)diffSets.windowOldSize);
     }
     
     int exitCode=hdiff_by_stream(oldFileName,newFileName,outDiffFileName,
