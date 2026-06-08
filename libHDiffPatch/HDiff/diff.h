@@ -94,16 +94,16 @@ void create_compressed_diff_stream(const hpatch_TStreamInput*  newData,
                                    const hdiff_TMTSets_s* mtsets=0);
 
 
-static const size_t kDefaultFastMatchBlockSize = 1024 * 1;
+static const size_t kDefaultFastMatchBlockSize = 1024*1;
 
 static const size_t kMatchWindowsBlockSize_default = (1<<6);
 static const size_t kDefaultBigCoverSize = 1024*16;
-static const size_t kDefaultWindowOldSize = 1024*256;
+static const size_t kDefaultWindowOldSize = 1024*512;
 
 //create a compressed diff data by window mode:
 //  optimize the access speed of old data when patch
-//  oldSize: max window bytes on old data;
-//  segSize: initial data granularity during window matching, DEFAULT oldSize/4;
+//  kOldWindowSize: max window bytes on old data;
+//  kSegSize: initial data granularity in a window matching, DEFAULT kOldWindowSize/16;
 //  throw std::runtime_error when I/O error or kSegSize too large,etc.
 void create_compressed_diff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                    const hpatch_TStreamOutput* out_diff,
@@ -172,8 +172,8 @@ void create_single_compressed_diff_stream(const hpatch_TStreamInput*  newData,
 
 //create single compressed diff data by window mode:
 //  optimize the access speed of old data when patch
-//  oldSize: max window bytes on old data;
-//  segSize: initial data granularity during window matching, DEFAULT oldSize/4;
+//  kOldWindowSize: max window bytes on old data;
+//  kSegSize: initial data granularity during window matching, DEFAULT kOldWindowSize/16;
 //  throw std::runtime_error when I/O error or kSegSize too large,etc.
 void create_single_compressed_diff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                           const hpatch_TStreamOutput* out_diff,
@@ -293,7 +293,6 @@ void get_match_covers_by_stream_and_sstring(unsigned char* newData,unsigned char
 //same as create?compressed_diff_window(), but not serialize diffData, only got covers
 // (get_match_covers_by_stream() or get_match_covers_by_sstring()) + get_match_windows_from_baseCovers() + loop get_match_covers_in_a_window()
 // if (kMatchBlockSize!=0) get_match_covers_by_stream(out baseCovers) else get_match_covers_by_sstring(out baseCovers);
-// kSegSize recommended kOldWindowSize/3,kOldWindowSize/4,kOldWindowSize/8, etc...
 // throw std::runtime_error when I/O error or kSegSize too large,etc.
 void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                 size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,std::vector<TCover>& out_covers,
@@ -303,7 +302,7 @@ void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_
                                 const hdiff_TMTSets_s* mtsets=0,bool isExtendCover=true);
 
 void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                                 size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
+                                 size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,bool isCollateMergeCover,
                                  std::vector<TCover>& out_covers,std::vector<hpatch_TWindow>& out_windows,
                                  size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
                                  size_t fastMatchBlockSize=kDefaultFastMatchBlockSize,
@@ -311,7 +310,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
                                  const hdiff_TMTSets_s* mtsets=0,bool isExtendCover=true);
 
 void get_match_windows_from_baseCovers(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,
-                                       size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,//if (kSegSize==0) kSegSize=kOldWindowSize/4;
+                                       size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,//if (kSegSize==0) kSegSize=kOldWindowSize/16;
                                        std::vector<TCover>& baseCovers,std::vector<hpatch_TWindow>& out_windows,
                                        std::vector<std::vector<TCover> >& out_bigCoverss,size_t kBigCoverSize);
 void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,

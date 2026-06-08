@@ -203,15 +203,15 @@ extern "C"
     
     void assert_covers_safe(const TInputCovers& covers,hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize);
 
-    void collate_covers(std::vector<TCover>& covers);
+    void collate_covers(std::vector<TCover>& covers,bool isCollateMerge=true);
 
     //output covers
     struct TOutputCovers{
         hpatch_force_inline void push_cover(const TCover& cover){
             covers.push_back(cover);
         }
-        hpatch_force_inline void collate_covers(){ // for support search covers by multi-thread
-            ::collate_covers(covers);
+        hpatch_force_inline void collate_covers(bool isCollateMerge=true){ // for support search covers by multi-thread
+            ::collate_covers(covers,isCollateMerge);
         }
         
         inline TOutputCovers(std::vector<TCover>& _covers,bool isInitClear=true)

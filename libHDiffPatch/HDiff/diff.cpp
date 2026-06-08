@@ -90,12 +90,14 @@ namespace hdiff_private{
     }
 }
 
-    void collate_covers(std::vector<TCover>& covers){
+    void collate_covers(std::vector<TCover>& covers,bool isCollateMergeCover){
         if (covers.size()<=1) return;
         std::sort(covers.begin(),covers.end(),cover_cmp_by_new_t<TCover>());
+        //if (!isCollateMergeCover) return; //same
         size_t backi=0;
         for (size_t i=1;i<covers.size();++i){
             if (covers[i].newPos<covers[backi].newPos+covers[backi].length){
+                assert(isCollateMergeCover);
                 if (covers[i].newPos+covers[i].length>covers[backi].newPos+covers[backi].length){
                     if (cover_is_collinear(covers[i],covers[backi])){//insert i part to backi,del i
                         covers[backi].length=covers[i].newPos+covers[i].length-covers[backi].newPos;
@@ -106,7 +108,8 @@ namespace hdiff_private{
                         covers[backi]=covers[i];
                     }
                 } //else del i
-            }else if ((covers[i].newPos==covers[backi].newPos+covers[backi].length)
+            }else if (isCollateMergeCover
+                    &&(covers[i].newPos==covers[backi].newPos+covers[backi].length)
                     &&(covers[i].oldPos==covers[backi].oldPos+covers[backi].length)){
                 covers[backi].length+=covers[i].length; //insert i all to backi,del i
             }else{ //save i
@@ -1953,13 +1956,15 @@ void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_
                                 size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,int kMinSingleMatchScore,
                                 bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets,bool isExtendCover){
     std::vector<hpatch_TWindow> windows;
-    get_match_covers_and_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,out_covers,windows,
+    const bool isCollateMerge=true;
+    get_match_covers_and_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,
+                                isCollateMerge,out_covers,windows,
                                 kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
                                 isUseBigCacheMatch,mtsets,isExtendCover);
 }
 
 void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                                 size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
+                                 size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,bool isCollateMergeCover,
                                  std::vector<TCover>& out_covers,std::vector<hpatch_TWindow>& out_windows,
                                  size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,int kMinSingleMatchScore,
                                  bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets,bool isExtendCover){
@@ -2030,7 +2035,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
         }
         windows.resize(insertWi);
         if (windows.size() > 1)
-            collate_covers(out_covers);
+            collate_covers(out_covers,isCollateMergeCover);
     } else
 #endif
     {
@@ -2048,7 +2053,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
         }
         windows.resize(insertWi);
         if (windows.size() > 1)
-            collate_covers(out_covers);
+            collate_covers(out_covers,isCollateMergeCover);
     }
 }
 
@@ -2056,7 +2061,7 @@ void get_match_windows_from_baseCovers(hpatch_StreamPos_t newSize,hpatch_StreamP
                                        size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
                                        std::vector<TCover>& baseCovers,std::vector<hpatch_TWindow>& out_windows,
                                        std::vector<std::vector<TCover> >& out_bigCoverss,size_t kBigCoverSize){
-    if (kSegSize==0) kSegSize=kOldWindowSize/4;
+    if (kSegSize==0) kSegSize=kOldWindowSize/16;
     TWindowMatcher windowMatcher(newSize,oldSize,
                                  kNewWindowSize,kOldWindowSize,kSegSize,baseCovers);
     windowMatcher.search_windows(out_windows);

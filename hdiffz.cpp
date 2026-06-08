@@ -189,9 +189,8 @@ static void printUsage(){
            "  -w[-oldSize-segSize]\n"
            "      diff by window; optimize the access speed of old data when patch;\n"
            "        in -m mode, the patch size may increase, while in -s mode, the patch size may be smaller.\n"
-           "      oldSize: max window bytes on old data, DEFAULT -w-256k;\n"
-           "      segSize: initial data granularity during window matching, DEFAULT oldSize/4;\n"
-           "      examples: -w-1m, -w-4m-256k, -w-16m-1m\n"
+           "      oldSize: max window bytes on old data, DEFAULT -w-512k; examples: -w-4m-1m, -w-16m;\n"
+           "      segSize: initial data granularity during window matching, DEFAULT oldSize/16;\n"
            "  -SD[-stepSize]\n"
            "      create single compressed diffData, only need one decompress buffer\n"
            "      when patch, and support step by step patching when step by step downloading!\n"
@@ -1164,24 +1163,22 @@ int hdiff_cmd_line(int argc, const char * argv[]){
         kMaxOpenFileNumber=kMaxOpenFileNumber_default_min;
 #endif
     //window diff defaults
-#if (_IS_NEED_VCDIFF)
-    if (diffSets.isVcDiff)
-        diffSets.isWindowDiffMode=hpatch_TRUE;
-#endif
     if (diffSets.isWindowDiffMode==_kNULL_VALUE)
         diffSets.isWindowDiffMode=hpatch_FALSE;
     if (diffSets.isWindowDiffMode){
-        static const size_t kDefaultOldWindowSize=1024*256;
-        static const size_t kMinWindowSize=1024*4;
+        static const size_t kMinWindowSize=1024*64;
+        static const size_t kMinWindowSegSize=1024*4;
         
         if (diffSets.windowOldSize==_kNULL_SIZE)
-            diffSets.windowOldSize=kDefaultOldWindowSize;
+            diffSets.windowOldSize=kDefaultWindowOldSize;
         if (diffSets.windowOldSize<kMinWindowSize)
             diffSets.windowOldSize=kMinWindowSize;
-        if (diffSets.windowNewSize<kMinWindowSize)
+        if (diffSets.windowNewSize<kMinWindowSize) // windowNewSize only for VCDiff format
             diffSets.windowNewSize=kMinWindowSize;
         if (diffSets.windowSegSize==_kNULL_SIZE)
             diffSets.windowSegSize=0; //will be set default value
+        else if (diffSets.windowSegSize<kMinWindowSegSize)
+            diffSets.windowSegSize=kMinWindowSegSize;
         if (diffSets.bigCoverSize==_kNULL_SIZE)
             diffSets.bigCoverSize=kDefaultBigCoverSize;
 #if (_IS_NEED_VCDIFF)
