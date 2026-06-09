@@ -32,7 +32,9 @@
 
 struct THDiffSets{
     hpatch_BOOL isDiffInMem;//or diff by stream
-    hpatch_BOOL isSingleCompressedDiff;
+    hpatch_BOOL isSingleCompressedDiff; //single compressed diff format (HDIFFSF20)
+    hpatch_BOOL isWindowDiff;//window diff format (HDIFFW26)
+    hpatch_BOOL isWindowDiffMode;//diff by window mode
     hpatch_BOOL isUseBigCacheMatch;
     hpatch_BOOL isCheckNotEqual;
     size_t matchScore;
@@ -40,8 +42,6 @@ struct THDiffSets{
     size_t matchBlockSize;
     size_t threadNum;
     size_t threadNumSearch_s;
-    //window diff mode
-    hpatch_BOOL isWindowDiffMode;
     size_t windowOldSize;
     size_t windowNewSize;
     size_t windowSegSize;
