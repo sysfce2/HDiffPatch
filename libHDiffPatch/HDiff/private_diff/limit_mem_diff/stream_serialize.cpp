@@ -955,4 +955,239 @@ void do_compress(std::vector<unsigned char>& out_code,const hpatch_TStreamInput*
         out_code.clear();//error or cancel
 }
 
+TChecksumOutputStream::TChecksumOutputStream()
+:_realOut(0),_checksumPlugin(0),_checksumHandle(0),_writePos(0),_isChecksuming(false){
+    this->streamImport=this;
+    this->streamSize=hpatch_kNullStreamPos;
+    this->read_writed=0;
+    this->write=_write;
+}
+
+void TChecksumOutputStream::init(const hpatch_TStreamOutput* realOut,hpatch_TChecksum* checksumPlugin,
+                                 hpatch_checksumHandle checksumHandle){
+    _realOut=realOut;
+    _checksumPlugin=checksumPlugin;
+    _checksumHandle=checksumHandle;
+    _isChecksuming=(checksumPlugin!=0);
+    _writePos=0;
+    this->streamImport=this;
+    this->streamSize=realOut->streamSize;
+    this->read_writed=0;
+    this->write=_write;
+}
+
+hpatch_BOOL TChecksumOutputStream::_write(const hpatch_TStreamOutput* stream,hpatch_StreamPos_t writeToPos,
+                                          const unsigned char* data,const unsigned char* data_end){
+    TChecksumOutputStream* self=(TChecksumOutputStream*)stream->streamImport;
+    hpatch_StreamPos_t writeEnd=writeToPos+(size_t)(data_end-data);
+    if (!self->_realOut->write(self->_realOut,writeToPos,data,data_end)) return hpatch_FALSE;
+
+    if (self->_isChecksuming){
+        checki(writeToPos==self->_writePos,"TChecksumOutputStream::write() writeToPos error!");
+        self->_checksumPlugin->append(self->_checksumHandle,data,data_end);
+    }
+    self->_writePos=writeEnd;
+    return hpatch_TRUE;
+}
+
+TChecksumInputStream::TChecksumInputStream()
+:_realIn(0),_checksumPlugin(0),_checksumHandle(0),_readPos(0),
+ _isChecksuming(false),_isRandomAccess(false){
+    this->streamImport=this;
+    this->streamSize=0;
+    this->read=_read;
+}
+
+void TChecksumInputStream::init(const hpatch_TStreamInput* realIn,hpatch_TChecksum* checksumPlugin,
+                                hpatch_checksumHandle checksumHandle){
+    _realIn=realIn;
+    _checksumPlugin=checksumPlugin;
+    _checksumHandle=checksumHandle;
+    _readPos=0;
+    _isChecksuming=(checksumPlugin!=0);
+    _isRandomAccess=false;
+    this->streamImport=this;
+    this->streamSize=realIn->streamSize;
+    this->read=_read;
+}
+
+void TChecksumInputStream::setIsRandomAccess(bool isRandomAccess){
+    _isRandomAccess=isRandomAccess;
+}
+
+hpatch_BOOL TChecksumInputStream::_read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
+                                         unsigned char* out_data,unsigned char* out_data_end){
+    TChecksumInputStream* self=(TChecksumInputStream*)stream->streamImport;
+    hpatch_StreamPos_t readEnd=readFromPos+(size_t)(out_data_end-out_data);
+    if (!self->_realIn->read(self->_realIn,readFromPos,out_data,out_data_end)) return hpatch_FALSE;
+
+    if (self->_isChecksuming){
+        if (!self->_isRandomAccess)//sequential mode
+            checki(readFromPos==self->_readPos,"TChecksumInputStream::read() readFromPos error!");
+        self->_checksumPlugin->append(self->_checksumHandle,out_data,out_data_end);
+    }
+    self->_readPos=readEnd;
+    return hpatch_TRUE;
+}
+
+TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
+                                     const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
+                                     size_t patchStepMemSize,bool isExtendCover,
+                                     size_t& outMaxStepMemSize,size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength)
+:_newStream(newStream),_oldStream(oldStream),_patchStepMemSize(patchStepMemSize),_isExtendCover(isExtendCover),
+ _curWindowIndex(0),_curMetadataPos(0),_curStepReadPos(0),_curStepStream(0),_readFromPos_back(0){
+    outMaxStepMemSize=0;
+    outMaxSubCoverCount=0;
+    outMaxWindowOldLength=0;
+    for (size_t wi=0;wi<windows.size();++wi)
+        outMaxWindowOldLength=std::max(outMaxWindowOldLength,windows[wi].oldLength);
+    _oldStreamMem.realloc((size_t)outMaxWindowOldLength);
+    _stepStreamMem.realloc(sizeof(TStepStream));
+    _windowDatas.resize(windows.size());
+
+    hpatch_StreamPos_t curNewPos=0;
+    size_t coveri=0;
+    hpatch_StreamPos_t totalStreamSize=0;
+    const hpatch_StreamPos_t newDataSize=newStream->streamSize;
+    for (size_t wi=0;wi<windows.size();++wi){
+        WindowData& wd=_windowDatas[wi];
+        hpatch_TWindow window=windows[wi];
+        if (window.newPos>curNewPos){
+            window.newLength+=window.newPos-curNewPos;
+            window.newPos=curNewPos;
+        }
+        if (wi+1==windows.size())
+            window.newLength=newDataSize-window.newPos;
+
+        const hpatch_StreamPos_t windowEnd=window.newPos+window.newLength;
+        const TCover* coverEnd=std::lower_bound(covers._covers+coveri,
+            covers._covers+covers._coverCount,
+            windowEnd,cover_cmp_by_new_t<TCover>());
+        size_t curCoverEndi=coverEnd-covers._covers;
+
+        const hpatch_StreamPos_t windowNewPos=window.newPos;
+        const hpatch_StreamPos_t windowOldPos=window.oldPos;
+        wd.adjustedCovers.clear();
+        for (size_t i=coveri;i<curCoverEndi;++i){
+            assert(covers[i].newPos+covers[i].length<=windowEnd);
+            TCover c=covers[i];
+            c.newPos-=windowNewPos;
+            c.oldPos-=windowOldPos;
+            wd.adjustedCovers.push_back(c);
+        }
+
+        wd.adjustedWindow=window;
+        _init_windowStepStream(wi,false);
+        const TStepStream& stepStream(*_curStepStream);
+
+        wd.stepDataSize=stepStream.streamSize;
+        wd.subCoverCount=stepStream.getCoverCount();
+
+        {//pack metadata
+            wd.metadataBuf.clear();
+            packUInt(wd.metadataBuf,wd.subCoverCount);
+            packUInt(wd.metadataBuf,wd.adjustedWindow.oldPos);
+            packUInt(wd.metadataBuf,wd.adjustedWindow.oldLength);
+        }
+
+        totalStreamSize+=wd.metadataBuf.size()+wd.stepDataSize;
+        outMaxStepMemSize=std::max(outMaxStepMemSize,stepStream.getMaxStepMemSize());
+        outMaxSubCoverCount=std::max(outMaxSubCoverCount,wd.subCoverCount);
+
+        coveri=curCoverEndi;
+        curNewPos=window.newPos+window.newLength;
+    }
+    assert(coveri==covers.size());
+    assert(curNewPos==newDataSize);
+    _clear_windowStepStream();
+
+    this->streamImport=this;
+    this->streamSize=totalStreamSize;
+    this->read=_read;
+}
+
+void TWindowDiffStream::_clear_windowStepStream(){
+    if (_curStepStream){
+        _curStepStream->~TStepStream();
+        _curStepStream=0;
+    }
+}
+
+TWindowDiffStream::~TWindowDiffStream(){
+    _clear_windowStepStream();
+}
+
+void TWindowDiffStream::_init_windowStepStream(size_t wi,bool isMustLoadOldToMem){
+    _clear_windowStepStream();
+    const WindowData& wd=_windowDatas[wi];
+    const hpatch_TWindow& win=wd.adjustedWindow;
+    //load old data into memory
+    const hpatch_TStreamInput* curOld=((isMustLoadOldToMem)||(_isExtendCover))?&_oldMemStream:&_oldClip;
+    if (curOld==&_oldMemStream){
+        size_t oldLen=(size_t)win.oldLength;
+        assert(_oldStreamMem.size()>=oldLen);
+        check(_oldStream->read(_oldStream,win.oldPos,_oldStreamMem.data(),_oldStreamMem.data()+oldLen)); //do checksum
+        mem_as_hStreamInput(&_oldMemStream,_oldStreamMem.data(),_oldStreamMem.data()+oldLen);
+    }else{
+        _oldClip.reset(_oldStream,win.oldPos,win.oldPos+win.oldLength);
+    }
+    _newClip.reset(_newStream,win.newPos,win.newPos+win.newLength);
+    _curStepStream=new(_stepStreamMem.data())
+                    TStepStream(&_newClip,curOld,wd.adjustedCovers,_patchStepMemSize,_isExtendCover);
+}
+
+hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
+                                     unsigned char* out_data,unsigned char* out_data_end){
+    TWindowDiffStream* self=(TWindowDiffStream*)stream->streamImport;
+    if (readFromPos==0){
+        self->_curWindowIndex=0;
+        self->_curMetadataPos=0;
+        self->_curStepReadPos=0;
+        self->_clear_windowStepStream();
+    }else{
+        checki(self->_readFromPos_back==readFromPos,"TWindowDiffStream::read() readFromPos error!");
+    }
+    self->_readFromPos_back=readFromPos+(size_t)(out_data_end-out_data);
+
+    while (out_data<out_data_end){
+        if (self->_curWindowIndex>=self->_windowDatas.size()) return hpatch_FALSE; //error
+
+        const WindowData& wd=self->_windowDatas[self->_curWindowIndex];
+
+        //read metadata
+        if (self->_curMetadataPos<wd.metadataBuf.size()){
+            size_t len=wd.metadataBuf.size()-self->_curMetadataPos;
+            if (len>(size_t)(out_data_end-out_data)) len=(size_t)(out_data_end-out_data);
+            memcpy(out_data,wd.metadataBuf.data()+self->_curMetadataPos,len);
+            out_data+=len;
+            self->_curMetadataPos+=len;
+            continue;
+        }
+
+        //init step stream if needed
+        if (self->_curStepStream==0)
+            self->_init_windowStepStream(self->_curWindowIndex,true);
+
+        //read step stream data
+        if (self->_curStepReadPos<wd.stepDataSize){
+            size_t len=(size_t)(out_data_end-out_data);
+            if (len>wd.stepDataSize-self->_curStepReadPos)
+                len=(size_t)(wd.stepDataSize-self->_curStepReadPos);
+            if (!self->_curStepStream->read(self->_curStepStream,self->_curStepReadPos,
+                                            out_data,out_data+len)) return hpatch_FALSE;
+            out_data+=len;
+            self->_curStepReadPos+=len;
+            continue;
+        }
+
+        //window done, move to next
+        self->_clear_windowStepStream();
+        self->_curWindowIndex++;
+        self->_curMetadataPos=0;
+        self->_curStepReadPos=0;
+    }
+    return hpatch_TRUE;
+}
+
+
 }//namespace hdiff_private

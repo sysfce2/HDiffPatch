@@ -31,6 +31,7 @@
 #include "../pack_uint.h" //for packUInt_fixSize
 #include "../mem_buf.h"
 #include "../bytes_rle.h"
+#include "../../../HPatch/checksum_plugin.h"
 
 struct hdiff_TCompress;
 namespace hdiff_private{
@@ -283,6 +284,75 @@ private:
                                     unsigned char* out_data,unsigned char* out_data_end);
     static hpatch_BOOL _write_check(const hpatch_TStreamOutput* stream,hpatch_StreamPos_t writeToPos,
                                     const unsigned char* data,const unsigned char* data_end);
+};
+
+
+struct TChecksumOutputStream:public hpatch_TStreamOutput{
+    TChecksumOutputStream();
+    void init(const hpatch_TStreamOutput* realOut,hpatch_TChecksum* checksumPlugin,
+              hpatch_checksumHandle checksumHandle);
+    inline void setIsChecksuming(bool isChecksuming) { _isChecksuming=isChecksuming; }
+private:
+    const hpatch_TStreamOutput*  _realOut;
+    hpatch_TChecksum*            _checksumPlugin;
+    hpatch_checksumHandle        _checksumHandle;
+    hpatch_StreamPos_t           _writePos;
+    bool                         _isChecksuming;
+    static hpatch_BOOL _write(const hpatch_TStreamOutput* stream,hpatch_StreamPos_t writeToPos,
+                              const unsigned char* data,const unsigned char* data_end);
+};
+
+struct TChecksumInputStream:public hpatch_TStreamInput{
+    TChecksumInputStream();
+    void init(const hpatch_TStreamInput* realIn,hpatch_TChecksum* checksumPlugin,
+              hpatch_checksumHandle checksumHandle);
+    inline void setIsChecksuming(bool isChecksuming) { _isChecksuming=isChecksuming; }
+    void setIsRandomAccess(bool isRandomAccess);
+private:
+    const hpatch_TStreamInput*  _realIn;
+    hpatch_TChecksum*           _checksumPlugin;
+    hpatch_checksumHandle       _checksumHandle;
+    hpatch_StreamPos_t          _readPos;
+    bool                        _isChecksuming;
+    bool                        _isRandomAccess;
+    static hpatch_BOOL _read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
+                              unsigned char* out_data,unsigned char* out_data_end);
+};
+
+
+struct TWindowDiffStream:public hpatch_TStreamInput{
+    TWindowDiffStream(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
+                      const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
+                      size_t patchStepMemSize,bool isExtendCover,
+                      size_t& outMaxStepMemSize,size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength);
+    ~TWindowDiffStream();
+private:
+    struct WindowData{
+        std::vector<TCover>         adjustedCovers;
+        hpatch_TWindow              adjustedWindow;
+        std::vector<unsigned char>  metadataBuf; // subCoverCount+oldPos+oldLength packed
+        hpatch_StreamPos_t          stepDataSize;
+        size_t                      subCoverCount;
+    };
+    const hpatch_TStreamInput*      _newStream;
+    const hpatch_TStreamInput*      _oldStream;
+    size_t                          _patchStepMemSize;
+    bool                            _isExtendCover;
+    std::vector<WindowData>         _windowDatas;
+    size_t                          _curWindowIndex;
+    size_t                          _curMetadataPos;
+    hpatch_StreamPos_t              _curStepReadPos;
+    TStepStream*                    _curStepStream;
+    TAutoMem                        _stepStreamMem;
+    TAutoMem                        _oldStreamMem;
+    TStreamClip                     _newClip;
+    TStreamClip                     _oldClip;
+    hpatch_TStreamInput             _oldMemStream;
+    hpatch_StreamPos_t              _readFromPos_back;
+    void _clear_windowStepStream();
+    void _init_windowStepStream(size_t wi,bool isMustLoadOldToMem);
+    static hpatch_BOOL _read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
+                             unsigned char* out_data,unsigned char* out_data_end);
 };
 
 

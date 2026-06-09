@@ -533,7 +533,7 @@ static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hp
 
         coveri=coveriEnd;
         targetPos+=targetLen;
-        if (targetPos>=nextMatchEnd)
+        if ((targetPos>=nextMatchEnd)&&(wi<matchWindows.size()))
             ++wi;
     }
 
@@ -547,6 +547,7 @@ static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hp
         targetPos+=addTargetLen;
     }
 
+    assert(wi==matchWindows.size());
     assert(coveri==covers.size());
     assert(targetPos==newDataSize);
 }
@@ -658,9 +659,9 @@ void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStrea
     std::vector<TCover> covers;
     std::vector<hpatch_TWindow> windows;
     const bool isExtendCover=false;
-    const bool isCollateMerge=false;
+    const bool isCollateMergeCover=false;
     get_match_covers_and_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,
-                                isCollateMerge,covers,windows,
+                                isCollateMergeCover,covers,windows,
                                 kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
                                 isUseBigCacheMatch,mtsets,isExtendCover);
     const bool isWriteHDiffzTag=false;

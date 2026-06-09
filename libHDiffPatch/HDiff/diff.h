@@ -30,6 +30,7 @@
 #define HDiff_diff_h
 #include <vector>
 #include "diff_types.h"
+#include "../HPatch/checksum_plugin.h"
 
 static const int kMinSingleMatchScore_default = 4;
 
@@ -258,6 +259,17 @@ void create_single_compressed_diff_block(unsigned char* newData,unsigned char* n
                                          int kMinSingleMatchScore=kMinSingleMatchScore_default,
                                          bool isUseBigCacheMatch=false,size_t threadNum=1);
 
+                                         
+void create_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                        const hpatch_TStreamOutput* out_diff,
+                        const hdiff_TCompress* compressPlugin,hpatch_TChecksum* checksumPlugin,
+                        size_t patchStepMemSize=kDefaultPatchStepMemSize,
+                        size_t kOldWindowSize=kDefaultWindowOldSize,size_t kSegSize=0,
+                        size_t kBigCoverSize=kDefaultBigCoverSize,size_t kMatchBlockSize=kMatchWindowsBlockSize_default,
+                        size_t fastMatchBlockSize=kDefaultFastMatchBlockSize,
+                        int kMinSingleMatchScore=kMinSingleMatchScore_default,bool isUseBigCacheMatch=false,
+                        const hdiff_TMTSets_s* mtsets=0,bool isExtendCover=true);
+
 
 //same as create?compressed_diff_stream(), but not serialize diffData, only got covers
 //  now isExtendCover always false,so not need pass isExtendCover
@@ -327,5 +339,9 @@ void serialize_compressed_diff(const hpatch_TStreamInput* newData,const hpatch_T
 void serialize_single_compressed_diff(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
                                       const TInputCovers& covers,const hpatch_TStreamOutput* out_diff,
                                       const hdiff_TCompress* compressPlugin,size_t patchStepMemSize,bool isExtendCover);
+void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
+                           const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
+                           const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
+                           hpatch_TChecksum* checksumPlugin,size_t patchStepMemSize,bool isExtendCover);
 
 #endif
