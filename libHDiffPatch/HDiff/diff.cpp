@@ -2171,20 +2171,17 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
         check(checksumNewHandle);
         checksumPlugin->begin(checksumNewHandle);
         checksumInNew.init(newStream,checksumPlugin,checksumNewHandle);
-        checksumInNew.setIsChecksuming(false); //now not checksum
 
         checksumOldHandle=checksumPlugin->open(checksumPlugin);
         check(checksumOldHandle);
         checksumPlugin->begin(checksumOldHandle);
         checksumInOld.init(oldStream,checksumPlugin,checksumOldHandle);
-        checksumInOld.setIsChecksuming(false); //now not checksum
         checksumInOld.setIsRandomAccess(true);
 
         checksumDiffHandle=checksumPlugin->open(checksumPlugin);
         check(checksumDiffHandle);
         checksumPlugin->begin(checksumDiffHandle);
         checksumOutDiff.init(out_diff,checksumPlugin,checksumDiffHandle);
-        checksumOutDiff.setIsChecksuming(false); //now not checksum
     }
 
     //create window diff data stream (init pass: compute sizes & stats)
@@ -2221,13 +2218,18 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
         checksumOld_ph=outDiff.pushBack_pos(tempChecksumBuf.data(),checksumByteSize);
         checksumNew_ph=outDiff.pushBack_pos(tempChecksumBuf.data(),checksumByteSize);
         checksumDiff_ph=outDiff.pushBack_pos(tempChecksumBuf.data(),checksumByteSize);
+        checksumOutDiff.setAutoChecksumBeginPos(outDiff.getWritedPos());
         checksumOutDiff.setIsChecksuming(true); //start checksum diff data
         checksumInOld.setIsChecksuming(true);
         checksumInNew.setIsChecksuming(true);
     }
 
     //push compressed window data stream
-    outDiff.pushStream(&windowDiffStream,compressPlugin,compressedWindowDataSize_ph);
+    hpatch_StreamPos_t wrtitedWindowDataSize=outDiff.pushStream(&windowDiffStream,compressPlugin);
+    checksumOutDiff.setIsChecksuming(false);
+    if (compressPlugin)
+        outDiff.packUInt_update(compressedWindowDataSize_ph,wrtitedWindowDataSize);
+    
 
     if (checksumByteSize>0){
         {//checksumOld: finalize
@@ -2242,7 +2244,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
             checksumNewHandle=0;
             outDiff.stream_update(checksumNew_ph,tempChecksumBuf.data());
         }
-        {//checksumDiff: finalize
+        {//checksumDiff: finalize +checksum head
             checksumOutDiff.setIsChecksuming(false);
             std::vector<hpatch_byte> tempBuf(checksumDiff_ph.pos);
             checki(out_diff->read_writed!=0,"serialize_window_diff() out_diff can't read error!");

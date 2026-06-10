@@ -39,7 +39,7 @@ extern "C" {
         hpatch_size_t (*checksumByteSize)(void); //result<=hpatch_kStreamCacheSize
         hpatch_checksumHandle (*open)(struct hpatch_TChecksum* plugin);
         void                 (*close)(struct hpatch_TChecksum* plugin,hpatch_checksumHandle handle);
-        void                 (*begin)(hpatch_checksumHandle handle);
+        void                 (*begin)(hpatch_checksumHandle handle); //must support reset
         void                (*append)(hpatch_checksumHandle handle,
                                       const unsigned char* part_data,const unsigned char* part_data_end);
         void                   (*end)(hpatch_checksumHandle handle,

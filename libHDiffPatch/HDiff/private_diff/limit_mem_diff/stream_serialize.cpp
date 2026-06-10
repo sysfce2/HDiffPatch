@@ -956,7 +956,8 @@ void do_compress(std::vector<unsigned char>& out_code,const hpatch_TStreamInput*
 }
 
 TChecksumOutputStream::TChecksumOutputStream()
-:_realOut(0),_checksumPlugin(0),_checksumHandle(0),_writePos(0),_isChecksuming(false){
+:_realOut(0),_checksumPlugin(0),_checksumHandle(0),_writePos(0),
+ _autoChecksumBeginPos(0),_isChecksuming(false){
     this->streamImport=this;
     this->streamSize=hpatch_kNullStreamPos;
     this->read_writed=0;
@@ -964,11 +965,12 @@ TChecksumOutputStream::TChecksumOutputStream()
 }
 
 void TChecksumOutputStream::init(const hpatch_TStreamOutput* realOut,hpatch_TChecksum* checksumPlugin,
-                                 hpatch_checksumHandle checksumHandle){
+                                 hpatch_checksumHandle checksumHandle,bool isChecksuming){
+    assert(realOut&&checksumPlugin&&checksumHandle);
     _realOut=realOut;
     _checksumPlugin=checksumPlugin;
     _checksumHandle=checksumHandle;
-    _isChecksuming=(checksumPlugin!=0);
+    _isChecksuming=isChecksuming;
     _writePos=0;
     this->streamImport=this;
     this->streamSize=realOut->streamSize;
@@ -983,6 +985,10 @@ hpatch_BOOL TChecksumOutputStream::_write(const hpatch_TStreamOutput* stream,hpa
     if (!self->_realOut->write(self->_realOut,writeToPos,data,data_end)) return hpatch_FALSE;
 
     if (self->_isChecksuming){
+        if (self->_autoChecksumBeginPos==writeToPos){ //reset checksum
+            self->_checksumPlugin->begin(self->_checksumHandle);
+            self->_writePos=writeToPos;
+        }
         checki(writeToPos==self->_writePos,"TChecksumOutputStream::write() writeToPos error!");
         self->_checksumPlugin->append(self->_checksumHandle,data,data_end);
     }
@@ -991,7 +997,7 @@ hpatch_BOOL TChecksumOutputStream::_write(const hpatch_TStreamOutput* stream,hpa
 }
 
 TChecksumInputStream::TChecksumInputStream()
-:_realIn(0),_checksumPlugin(0),_checksumHandle(0),_readPos(0),
+:_realIn(0),_checksumPlugin(0),_checksumHandle(0),_checkedPos(0),
  _isChecksuming(false),_isRandomAccess(false){
     this->streamImport=this;
     this->streamSize=0;
@@ -999,34 +1005,50 @@ TChecksumInputStream::TChecksumInputStream()
 }
 
 void TChecksumInputStream::init(const hpatch_TStreamInput* realIn,hpatch_TChecksum* checksumPlugin,
-                                hpatch_checksumHandle checksumHandle){
+                                hpatch_checksumHandle checksumHandle,bool isChecksuming){
+    assert(realIn&&checksumPlugin&&checksumHandle);
     _realIn=realIn;
     _checksumPlugin=checksumPlugin;
     _checksumHandle=checksumHandle;
-    _readPos=0;
-    _isChecksuming=(checksumPlugin!=0);
+    _checkedPos=0;
+    _isChecksuming=isChecksuming;
     _isRandomAccess=false;
     this->streamImport=this;
     this->streamSize=realIn->streamSize;
     this->read=_read;
 }
 
-void TChecksumInputStream::setIsRandomAccess(bool isRandomAccess){
-    _isRandomAccess=isRandomAccess;
-}
-
 hpatch_BOOL TChecksumInputStream::_read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
-                                         unsigned char* out_data,unsigned char* out_data_end){
+                                        unsigned char* out_data,unsigned char* out_data_end){
     TChecksumInputStream* self=(TChecksumInputStream*)stream->streamImport;
+    if ((self->_isChecksuming)&&(!self->_isRandomAccess)&&(readFromPos>self->_checkedPos)){ //sequential mode gap
+        unsigned char _lc_buf[1024*16];
+        size_t          bufSize=(size_t)(out_data_end-out_data);
+        unsigned char*  pbuf=out_data;
+        if (bufSize<sizeof(_lc_buf)){ pbuf=_lc_buf; bufSize=sizeof(_lc_buf); }
+        while (readFromPos>self->_checkedPos){
+            hpatch_StreamPos_t rlen=readFromPos-self->_checkedPos;
+            if (rlen>bufSize) rlen=bufSize;
+            if (!self->_realIn->read(self->_realIn,self->_checkedPos,pbuf,pbuf+rlen)) return hpatch_FALSE;
+            self->_checksumPlugin->append(self->_checksumHandle,pbuf,pbuf+rlen);
+            self->_checkedPos+=rlen;
+        }
+    }
+
     hpatch_StreamPos_t readEnd=readFromPos+(size_t)(out_data_end-out_data);
     if (!self->_realIn->read(self->_realIn,readFromPos,out_data,out_data_end)) return hpatch_FALSE;
 
     if (self->_isChecksuming){
-        if (!self->_isRandomAccess)//sequential mode
-            checki(readFromPos==self->_readPos,"TChecksumInputStream::read() readFromPos error!");
-        self->_checksumPlugin->append(self->_checksumHandle,out_data,out_data_end);
+        if (!self->_isRandomAccess){//sequential mode
+            if (readEnd>self->_checkedPos){
+                size_t clen=readEnd-self->_checkedPos;
+                self->_checksumPlugin->append(self->_checksumHandle,out_data_end-clen,out_data_end);
+                self->_checkedPos=readEnd;
+            }
+        }else{//random access mode
+            self->_checksumPlugin->append(self->_checksumHandle,out_data,out_data_end);
+        }
     }
-    self->_readPos=readEnd;
     return hpatch_TRUE;
 }
 
@@ -1123,10 +1145,10 @@ void TWindowDiffStream::_init_windowStepStream(size_t wi,bool isMustLoadOldToMem
     const hpatch_TWindow& win=wd.adjustedWindow;
     //load old data into memory
     const hpatch_TStreamInput* curOld=((isMustLoadOldToMem)||(_isExtendCover))?&_oldMemStream:&_oldClip;
-    if (curOld==&_oldMemStream){
+    if (curOld==&_oldMemStream){//NIOTE: for do checksum & random read old speed
         size_t oldLen=(size_t)win.oldLength;
         assert(_oldStreamMem.size()>=oldLen);
-        check(_oldStream->read(_oldStream,win.oldPos,_oldStreamMem.data(),_oldStreamMem.data()+oldLen)); //do checksum
+        check(_oldStream->read(_oldStream,win.oldPos,_oldStreamMem.data(),_oldStreamMem.data()+oldLen)); 
         mem_as_hStreamInput(&_oldMemStream,_oldStreamMem.data(),_oldStreamMem.data()+oldLen);
     }else{
         _oldClip.reset(_oldStream,win.oldPos,win.oldPos+win.oldLength);

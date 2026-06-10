@@ -32,7 +32,7 @@
 
 struct THDiffSets{
     hpatch_BOOL isDiffInMem;//or diff by stream
-    hpatch_BOOL isSingleCompressedDiff; //single compressed diff format (HDIFFSF20)
+    hpatch_BOOL isSingleCompressedDiff; //single compressed diff format (HDIFFSF20 or endsley/bsdiff)
     hpatch_BOOL isWindowDiff;//window diff format (HDIFFW26)
     hpatch_BOOL isWindowDiffMode;//diff by window mode
     hpatch_BOOL isUseBigCacheMatch;
