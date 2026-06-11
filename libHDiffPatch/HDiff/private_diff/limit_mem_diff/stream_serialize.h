@@ -325,8 +325,9 @@ private:
 struct TWindowDiffStream:public hpatch_TStreamInput{
     TWindowDiffStream(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
                       const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
-                      size_t patchStepMemSize,bool isExtendCover,
-                      size_t& outMaxStepMemSize,size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength);
+                      size_t patchStepMemSize,bool isExtendCover,size_t& outMaxStepMemSize,
+                      size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength,
+                      const unsigned char* extraData,size_t extraDataSize);
     ~TWindowDiffStream();
 private:
     struct WindowData{
@@ -351,6 +352,8 @@ private:
     TStreamClip                     _oldClip;
     hpatch_TStreamInput             _oldMemStream;
     hpatch_StreamPos_t              _readFromPos_back;
+    const unsigned char* const      _extraData;
+    const size_t                    _extraDataSize;
     void _clear_windowStepStream();
     void _init_windowStepStream(size_t wi,bool isMustLoadOldToMem);
     static hpatch_BOOL _read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,

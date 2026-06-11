@@ -1054,10 +1054,12 @@ hpatch_BOOL TChecksumInputStream::_read(const hpatch_TStreamInput* stream,hpatch
 
 TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
                                      const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
-                                     size_t patchStepMemSize,bool isExtendCover,
-                                     size_t& outMaxStepMemSize,size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength)
+                                     size_t patchStepMemSize,bool isExtendCover,size_t& outMaxStepMemSize,
+                                     size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength,
+                                     const unsigned char* extraData,size_t extraDataSize)
 :_newStream(newStream),_oldStream(oldStream),_patchStepMemSize(patchStepMemSize),_isExtendCover(isExtendCover),
- _curWindowIndex(0),_curMetadataPos(0),_curStepReadPos(0),_curStepStream(0),_readFromPos_back(0){
+ _curWindowIndex(0),_curMetadataPos(0),_curStepReadPos(0),_curStepStream(0),_readFromPos_back(0),
+ _extraData(extraData),_extraDataSize(extraDataSize){
     outMaxStepMemSize=0;
     outMaxSubCoverCount=0;
     outMaxWindowOldLength=0;
@@ -1069,7 +1071,7 @@ TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const 
 
     hpatch_StreamPos_t curNewPos=0;
     size_t coveri=0;
-    hpatch_StreamPos_t totalStreamSize=0;
+    hpatch_StreamPos_t totalStreamSize=extraDataSize;
     const hpatch_StreamPos_t newDataSize=newStream->streamSize;
     for (size_t wi=0;wi<windows.size();++wi){
         WindowData& wd=_windowDatas[wi];
@@ -1170,10 +1172,17 @@ hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_St
         checki(self->_readFromPos_back==readFromPos,"TWindowDiffStream::read() readFromPos error!");
     }
     self->_readFromPos_back=readFromPos+(size_t)(out_data_end-out_data);
+    
+    if (readFromPos<self->_extraDataSize){//read extraData
+        size_t clen=self->_extraDataSize-readFromPos;
+        clen=std::min(clen,(size_t)(out_data_end-out_data));
+        memcpy(out_data,self->_extraData+readFromPos,clen);
+        out_data+=clen;
+        readFromPos+=clen;
+    }
 
     while (out_data<out_data_end){
         if (self->_curWindowIndex>=self->_windowDatas.size()) return hpatch_FALSE; //error
-
         const WindowData& wd=self->_windowDatas[self->_curWindowIndex];
 
         //read metadata

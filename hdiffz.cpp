@@ -180,7 +180,7 @@ static void printUsage(){
            "      if set -block-0, means don't use block match;\n"
            "      fastMatchBlockSize>=4, recommended 128,4k,64k, etc...\n"
            "      if newData similar to oldData then diff speed++ & diff memory--,\n"
-           "      but small possibility outDiffFile's size+\n"
+           "      but small possibility outDiffFile size+\n"
            "  -cache \n"
            "      must run with -m;\n"
            "      set is use a big cache for slow match, DEFAULT false;\n"
@@ -188,18 +188,16 @@ static void printUsage(){
            "      big cache max used O(oldFileSize) memory, and build slow(diff speed--)\n" 
            "  -w[-oldSize-segSize]\n"
            "      diff by window mode; optimize the access of old data when patch;\n"
-           "        in -m mode, the patch size may slight increase, while in -s mode, the patch size may be smaller.\n"
-           "      oldSize: max window bytes on old data, DEFAULT -w-512k; examples: -w-4m-1m, -w-16m;\n"
-           "      segSize: initial data granularity during window matching, segSize<oldSize, DEFAULT oldSize/16;\n"
-           "  -SD[-stepSize]\n"
-           "      create single compressed diffData(HDIFFSF20 format), only need one decompress buffer\n"
-           "      when patch, and support step by step patching when step by step downloading!\n"
-           "        and supports multi-thread patching!\n"
-           "      stepSize>=" _HDIFFPATCH_EXPAND_AND_QUOTE(hpatch_kStreamCacheSize) ", DEFAULT -SD-256k, recommended 64k,2m etc...\n"
+           "        in -m mode, outDiffFile size+, while in -s mode, outDiffFile size--\n"
+           "        if oldSize++ or segSize--, outDiffFile size-, but diff & patch speed--\n"
+           "      oldSize: max window bytes on old data, DEFAULT -w-512k;\n"
+           "        for big file, recommended -w-4m-1m, -w-16m, etc...\n"
+           "      segSize: initial data granularity during window matching,\n"
+           "        segSize < oldSize, DEFAULT oldSize/16;\n"
            "  -WD[-stepSize]\n"
-           "      create window diffData(HDIFFW26 format), optimize the access of old data when patch;\n"
-           "      recommended as the primary diff format; when patch, and support step by step patching\n"
-           "        when step by step downloading! and supports multi-thread patching!\n"
+           "      create window diffData(HDIFFW26), optimize the access of old data when patch;\n"
+           "      recommended as the primary diff format; when patch, and support step by step\n"
+           "        patching when step by step downloading! and supports multi-thread patching!\n"
            "      requires diff by window mode, auto enable -w if not set;\n"
 #ifdef _CompressPlugin_zstd
            "      default compress by zstd, can set -c-no for no compress;\n"
@@ -212,6 +210,11 @@ static void printUsage(){
 #   endif
 #endif
            "      stepSize>=" _HDIFFPATCH_EXPAND_AND_QUOTE(hpatch_kStreamCacheSize) ", DEFAULT -WD-256k, recommended 128k,512k etc...\n"
+           "  -SD[-stepSize]\n"
+           "      create single compressed diffData(HDIFFSF20 format), only need one decompress buffer\n"
+           "      when patch, and support step by step patching when step by step downloading!\n"
+           "        and supports multi-thread patching!\n"
+           "      stepSize>=" _HDIFFPATCH_EXPAND_AND_QUOTE(hpatch_kStreamCacheSize) ", DEFAULT -SD-256k, recommended 64k,2m etc...\n"
 #if (_IS_NEED_BSDIFF)
            "  -BSD\n"
            "      create diffFile compatible with bsdiff4, unsupport input directory(folder).\n"
@@ -1676,6 +1679,7 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
         printf("diffDataSize: %" PRIu64 "\n",diffData_in.base.streamSize);
 
         hpatch_BOOL isSingleCompressedDiff=hpatch_FALSE;
+        hpatch_BOOL isWindowDiff=hpatch_FALSE;
 #if (_IS_NEED_BSDIFF)
         hpatch_BOOL isBsDiff=hpatch_FALSE;
         hpatch_BOOL isSingleCompressedBsDiff=hpatch_FALSE;
@@ -1685,9 +1689,13 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
 #endif
         hpatch_TDecompress  _decompressPlugin={0};
         hpatch_TDecompress* saved_decompressPlugin=&_decompressPlugin;
+        hpatch_TChecksum    _checksumPlugin={0};
+        hpatch_TChecksum*   saved_checksumPlugin=&_checksumPlugin;
         {
             hpatch_compressedDiffInfo diffInfo;
             hpatch_singleCompressedDiffInfo sdiffInfo;
+            hpatch_windowDiffInfo winDiffInfo;
+            const char* checksumType="";
 #if (_IS_NEED_VCDIFF)
             hpatch_VcDiffInfo vcdiffInfo;
 #endif
@@ -1701,12 +1709,18 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
                 isSingleCompressedDiff=hpatch_TRUE;
                 if (!diffSets.isDoDiff)
                     printf("test single compressed diffData!\n");
+            }else if (getWindowDiffInfo(&winDiffInfo,&diffData_in.base,0)){
+                compressType=winDiffInfo.compressType;
+                checksumType=winDiffInfo.checksumType;
+                isWindowDiff=hpatch_TRUE;
+                if (!diffSets.isDoDiff)
+                    printf("test window diffData!\n");
 #if (_IS_NEED_BSDIFF)
             }else if (getIsBsDiff(&diffData_in.base,&isSingleCompressedBsDiff)){
                 *saved_decompressPlugin=_bz2DecompressPlugin_unsz;
                 isBsDiff=hpatch_TRUE;
                 if (!diffSets.isDoDiff)
-                    printf(isSingleCompressedBsDiff?"test endsley/bsdiff's diffData!\n":"test bsdiff4's diffData!\n");
+                    printf(isSingleCompressedBsDiff?"test endsley/bsdiff diffData!\n":"test bsdiff4 diffData!\n");
 #endif
 #if (_IS_NEED_VCDIFF)
             }else if (getVcDiffInfo(&vcdiffInfo,&diffData_in.base,hpatch_FALSE)){
@@ -1714,7 +1728,7 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
                       HDIFF_PATCH_ERROR,"VCDIFF unsported compressorID");
                 isVcDiff=hpatch_TRUE;
                 if (!diffSets.isDoDiff)
-                    printf("test VCDIFF's diffData!\n");
+                    printf("test VCDIFF diffData!\n");
 #endif
             }else{
                 check(hpatch_FALSE,HDIFF_PATCH_ERROR,"get diff info");
@@ -1725,6 +1739,12 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
             }
             if (saved_decompressPlugin->open==0) saved_decompressPlugin=0;
             else saved_decompressPlugin->decError=hpatch_dec_ok;
+            if (checksumType[0]!='\0'){
+                check(findChecksum(&saved_checksumPlugin,checksumType),
+                      HDIFF_PATCH_ERROR,"diff data saved checksum type");
+            }else{
+                saved_checksumPlugin=0;
+            }
         }
         bool diffrt;
 #if (_IS_NEED_BSDIFF)
@@ -1737,7 +1757,12 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
             diffrt=check_vcdiff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin);
         else
 #endif
-        if (isSingleCompressedDiff)
+        if (isWindowDiff){
+            TWindowPatchResult wp_rt=check_window_diff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin,saved_checksumPlugin);
+            diffrt=(wp_rt==kWindowPatch_ok);
+            if (wp_rt!=kWindowPatch_ok)
+                printf("  patch_window_diff() return error code: TWindowPatchResult %d\n",(int)wp_rt);
+        }else if (isSingleCompressedDiff)
             diffrt=check_single_compressed_diff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin);
         else
             diffrt=check_compressed_diff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin);

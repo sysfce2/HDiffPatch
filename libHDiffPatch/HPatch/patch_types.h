@@ -189,7 +189,11 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
     #endif
     
     #ifndef hpatch_kMaxPluginTypeLength
-    #   define hpatch_kMaxPluginTypeLength   259
+    #   define hpatch_kMaxPluginTypeLength   (256+8-1)
+    #endif
+
+    #ifndef hpatch_kWindowDiffHeadMaxSize
+    #   define hpatch_kWindowDiffHeadMaxSize   hpatch_kStreamCacheSize
     #endif
 
     typedef struct hpatch_compressedDiffInfo{
@@ -354,6 +358,38 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_StreamPos_t  newLength;
     } hpatch_TWindow;
 
+
+    typedef struct hpatch_windowDiffInfo{
+        hpatch_StreamPos_t  newDataSize;
+        hpatch_StreamPos_t  oldDataSize;
+        hpatch_StreamPos_t  coverCount;
+        hpatch_StreamPos_t  windowCount;
+        hpatch_StreamPos_t  maxStepMemSize;
+        hpatch_StreamPos_t  maxSubCoverCount;
+        hpatch_StreamPos_t  maxWindowOldSize;
+        hpatch_StreamPos_t  checksumByteSize;      //0=no checksum
+        hpatch_StreamPos_t  extraDataSize;
+        hpatch_StreamPos_t  uncompressedSize;      //windowDiffStreamSize
+        hpatch_StreamPos_t  compressedSize;        //0=uncompressed, >0=compressed
+        hpatch_StreamPos_t  windowDataPos;         //window data begin pos; old,new,diff's checksum begin pos=windowDataPos-3*checksumByteSize
+        char                compressType[hpatch_kMaxPluginTypeLength+1];
+        char                checksumType[hpatch_kMaxPluginTypeLength+1];
+    } hpatch_windowDiffInfo;
+
+    struct hpatch_TChecksum;
+    typedef struct winpatch_listener_t{
+        void*         import;   
+        hpatch_BOOL (*onDiffInfo)(struct winpatch_listener_t* listener,
+                                  const hpatch_windowDiffInfo* info,
+                                  hpatch_TDecompress** out_decompressPlugin,//find decompressPlugin by info->compressType
+                                  struct hpatch_TChecksum** out_checksumPlugin, //find checksumPlugin by info->checksumType
+                                  hpatch_BOOL* isCheckSumNew,   // *isCheckSumNew default true when have info->checksumType
+                                  hpatch_BOOL* isCheckSumOld,hpatch_BOOL* isCheckSumDiff, 
+                                  unsigned char** out_temp_cache,    //*out_temp_cacheEnd-*out_temp_cache == info->maxWindowOldSize + info->stepMemSize + (I/O cache memory)
+                                  unsigned char** out_temp_cacheEnd);//  note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
+        void        (*onPatchFinish)(struct winpatch_listener_t* listener, //onPatchFinish can null
+                                     unsigned char* temp_cache, unsigned char* temp_cacheEnd);
+    } winpatch_listener_t;
 
 #ifdef __cplusplus
 }

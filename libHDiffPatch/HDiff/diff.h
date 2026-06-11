@@ -270,6 +270,11 @@ void create_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamI
                         int kMinSingleMatchScore=kMinSingleMatchScore_default,bool isUseBigCacheMatch=false,
                         const hdiff_TMTSets_s* mtsets=0,bool isExtendCover=true);
 
+enum TWindowPatchResult;
+enum TWindowPatchResult check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                          const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
+                                          hpatch_TChecksum* checksumPlugin);
+
 
 //same as create?compressed_diff_stream(), but not serialize diffData, only got covers
 //  now isExtendCover always false,so not need pass isExtendCover
