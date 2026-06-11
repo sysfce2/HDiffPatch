@@ -2837,7 +2837,6 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
         _clip_unpackUIntTo(&subCoverCount,&mainClip);
         _clip_unpackUIntTo(&windowOldPos,&mainClip);
         _clip_unpackUIntTo(&windowOldLength,&mainClip);
-        assert(windowOldLength>0);
 #if (defined __RUN_MEM_SAFE_CHECK)
         if (windowOldPos>oldData->streamSize) return _hpatch_FALSE;
         if (windowOldLength>diffInfo->maxWindowOldSize) return _hpatch_FALSE;

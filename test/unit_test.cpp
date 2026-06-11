@@ -75,7 +75,7 @@ const size_t patch_single_stream_threadNum=1; // 1..5;  1 single-thread, >1 mult
 #include "../../hsynz/dict_decompress_plugin_demo.h" // https://github.com/sisong/hsynz
 #endif
 
-#define _ChecksumPlugin_fadler32
+#define _ChecksumPlugin_fadler64
 #include "../checksum_plugin_demo.h"
 
 #ifdef  _CompressPlugin_no
@@ -234,7 +234,8 @@ static bool check_diff_stream(const TByte* newData,const TByte* newData_end,
     return true;
 }
 
-static hpatch_TChecksum* hsynzDefaultChecksum=&fadler32ChecksumPlugin;
+static hpatch_TChecksum* hsynzDefaultChecksum=&fadler64ChecksumPlugin;
+static hpatch_TChecksum* hdiffwDefaultChecksum=&fadler64ChecksumPlugin;
 
 struct TSyncInfoListener:public ISyncInfoListener{
     inline TSyncInfoListener(){
@@ -433,6 +434,7 @@ enum TDiffType{
     kDiffSs,
     kDiffi,
     kDiffiI, //inplace-patch
+    kDiffW,
     kHSynz,
 };
 static const size_t kDiffTypeCount=kHSynz+1;
@@ -452,6 +454,28 @@ hpatch_BOOL _sspatch_onDiffInfo(struct sspatch_listener_t* listener,
     *out_temp_cache=temp_cache;
     *out_temp_cacheEnd=temp_cache+temp_cache_size;
     *out_decompressPlugin=decompressPlugin;
+    return hpatch_TRUE;
+}
+
+static hpatch_BOOL _winpatch_onDiffInfo(struct winpatch_listener_t* listener,
+                                         const hpatch_windowDiffInfo* info,
+                                         hpatch_TDecompress** out_decompressPlugin,
+                                         hpatch_TChecksum** out_checksumPlugin,
+                                         hpatch_BOOL* isCheckSumNew,hpatch_BOOL* isCheckSumOld,hpatch_BOOL* isCheckSumDiff,
+                                         unsigned char** out_temp_cache,
+                                         unsigned char** out_temp_cacheEnd){
+    size_t temp_cache_size=(size_t)(info->maxWindowOldSize+info->maxStepMemSize)+hpatch_kFileIOBufBetterSize*3;
+    TAutoMem& _buf=*(TAutoMem*)listener->import;
+    if (_buf.size()<temp_cache_size)
+        _buf.realloc(temp_cache_size);
+    unsigned char* temp_cache=_buf.data();
+    *out_temp_cache=temp_cache;
+    *out_temp_cacheEnd=temp_cache+temp_cache_size;
+    *out_decompressPlugin=decompressPlugin;
+    *out_checksumPlugin=&fadler64ChecksumPlugin;
+    *isCheckSumNew=hpatch_TRUE;
+    *isCheckSumOld=hpatch_TRUE;
+    *isCheckSumDiff=hpatch_TRUE;
     return hpatch_TRUE;
 }
 
@@ -544,6 +568,17 @@ long attackPacth(TByte* out_newData,TByte* out_newData_end,
         case kHSynz: {
             _hsynz_local_patch(out_newData,out_newData_end,oldData,oldData_end,diffData,diffData_end);
             _hsynz_sync_patch(out_newData,out_newData_end,oldData,oldData_end);
+        } break;
+        case kDiffW: {
+            TAutoMem  _buf;
+            winpatch_listener_t listener={&_buf,_winpatch_onDiffInfo,0};
+            struct hpatch_TStreamOutput out_newStream;
+            struct hpatch_TStreamInput  oldStream;
+            struct hpatch_TStreamInput  diffStream;
+            mem_as_hStreamOutput(&out_newStream,out_newData,out_newData_end);
+            mem_as_hStreamInput(&oldStream,oldData,oldData_end);
+            mem_as_hStreamInput(&diffStream,diffData,diffData_end);
+            patch_window_diff(&listener,&out_newStream,&oldStream,&diffStream,0);
         } break;
     }
     return 0;
@@ -745,6 +780,33 @@ long test(const TByte* newData,const TByte* newData_end,
 #endif
         }
     }
+    {//test diffw
+        std::vector<TByte> diffData;
+        struct hpatch_TStreamInput  newStream;
+        struct hpatch_TStreamInput  oldStream;
+        TVectorAsStreamOutput out_diffStream(diffData);
+        mem_as_hStreamInput(&newStream,newData,newData_end);
+        mem_as_hStreamInput(&oldStream,oldData,oldData_end);
+
+        create_window_diff(&newStream,&oldStream,&out_diffStream,
+                            compressPlugin,hdiffwDefaultChecksum,
+                            kDefaultPatchStepMemSize,1024*16,0,1024*4,0);
+        if (out_diffSizes) out_diffSizes[kDiffW]+=diffData.size();
+        struct hpatch_TStreamInput in_diffStream;
+        mem_as_hStreamInput(&in_diffStream,diffData.data(),diffData.data()+diffData.size());
+        if (kWindowPatch_ok!=check_window_diff(&newStream,&oldStream,&in_diffStream,
+                                                decompressPlugin,hdiffwDefaultChecksum)){
+            printf("\n diffw error!!! tag:%s\n",tag);
+            ++result;
+        }else{
+            printf(" diffw:%ld", (long)(diffData.size()));
+#ifdef _AttackPacth_ON
+            long exceptionCount=attackPacth(newData_end-newData,oldData,oldData_end,
+                                            diffData.data(),diffData.data()+diffData.size(),_rand(),kDiffW);
+            if (exceptionCount>0) return exceptionCount;
+#endif
+        }
+    }
     {//test hsynz
         std::vector<TByte> diffData;
         _create_hsynz_diff(newData,newData_end,oldData,oldData_end,diffData);
@@ -876,12 +938,12 @@ int main(int argc, const char * argv[]){
 
     printf("\nchecked:%ld  errorCount:%ld\n",kRandTestCount,errorCount);
     printf("newSize:100%% oldSize:%2.2f%% diffO:%2.2f%% diffZ:%2.2f%%(s:%2.2f%%)"
-           " diffS:%2.2f%%(s:%2.2f%%) diffi:%2.2f%% diffiI:%2.2f%% hsynz:%2.2f%%\n",
+           " diffS:%2.2f%%(s:%2.2f%%) diffi:%2.2f%% diffiI:%2.2f%% diffW:%2.2f%% hsynz:%2.2f%%\n",
             sumOldSize*100.0/sumNewSize,sumDiffSizes[kDiffO]*100.0/sumNewSize,
             sumDiffSizes[kDiffZ]*100.0/sumNewSize,sumDiffSizes[kDiffZs]*100.0/sumNewSize,
             sumDiffSizes[kDiffS]*100.0/sumNewSize,sumDiffSizes[kDiffSs]*100.0/sumNewSize,
             sumDiffSizes[kDiffi]*100.0/sumNewSize,sumDiffSizes[kDiffiI]*100.0/sumNewSize,
-            sumDiffSizes[kHSynz]*100.0/sumNewSize);
+            sumDiffSizes[kDiffW]*100.0/sumNewSize,sumDiffSizes[kHSynz]*100.0/sumNewSize);
     clock_t time2=clock();
     printf("\nrun time:%.1f s\n",(time2-time1)*(1.0/CLOCKS_PER_SEC));
 

@@ -2037,6 +2037,14 @@ void get_match_covers_by_window(const hpatch_TStreamInput* newData,const hpatch_
                                 isUseBigCacheMatch,mtsets,isExtendCover);
 }
 
+    static void _ensure_default_window(std::vector<hpatch_TWindow>& windows,hpatch_StreamPos_t newDataSize){
+        if (windows.empty()&&(newDataSize>0)){
+            hpatch_TWindow defWin; memset(&defWin,0,sizeof(defWin));
+            defWin.newLength=newDataSize;
+            windows.push_back(defWin);
+        }
+    }
+
 void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                  size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,bool isCollateMergeCover,
                                  std::vector<TCover>& out_covers,std::vector<hpatch_TWindow>& out_windows,
@@ -2114,6 +2122,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
                 windows[insertWi++] = windows[i];
         }
         windows.resize(insertWi);
+        _ensure_default_window(windows,newData->streamSize);
         if (windows.size() > 1)
             collate_covers(out_covers,isCollateMergeCover);
     } else
@@ -2132,6 +2141,7 @@ void get_match_covers_and_window(const hpatch_TStreamInput* newData,const hpatch
             }
         }
         windows.resize(insertWi);
+        _ensure_default_window(windows,newData->streamSize);
         if (windows.size() > 1)
             collate_covers(out_covers,isCollateMergeCover);
     }
