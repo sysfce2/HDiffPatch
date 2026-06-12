@@ -534,6 +534,16 @@ static hpatch_BOOL _getIsSingleStreamDiffFile(const char* diffFileName){
     return result;
 }
 
+static hpatch_BOOL _getIsWindowDiffFile(const char* diffFileName){
+    hpatch_TFileStreamInput diffData;
+    hpatch_TFileStreamInput_init(&diffData);
+    if (!hpatch_TFileStreamInput_open(&diffData,diffFileName)) return hpatch_FALSE;
+    hpatch_windowDiffInfo diffInfo;
+    hpatch_BOOL result=getWindowDiffInfo(&diffInfo,&diffData.base,0);
+    if (!hpatch_TFileStreamInput_close(&diffData)) return hpatch_FALSE;
+    return result;
+}
+
 #if (_IS_NEED_BSDIFF)
 static hpatch_BOOL _getIsBsDiffFile(const char* diffFileName) {
     hpatch_TFileStreamInput diffData;
@@ -1451,6 +1461,7 @@ int hdiff_cmd_line(int argc, const char * argv[]){
         const char* outDiffFileName=arg_values[1];
         hpatch_BOOL isDiffFile=_getIsCompressedDiffFile(diffFileName);
         isDiffFile=isDiffFile || _getIsSingleStreamDiffFile(diffFileName);
+        isDiffFile=isDiffFile || _getIsWindowDiffFile(diffFileName);
 #if (_IS_NEED_DIR_DIFF_PATCH)
         isDiffFile=isDiffFile || getIsDirDiffFile(diffFileName);
 #endif
@@ -1833,12 +1844,14 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
     hpatch_BOOL  _isInClear=hpatch_FALSE;
     hpatch_BOOL  isDirDiff=hpatch_FALSE;
     hpatch_BOOL  isSingleDiff=hpatch_FALSE;
+    hpatch_BOOL  isWindowDiff=hpatch_FALSE;
     hpatch_compressedDiffInfo diffInfo;
     hpatch_singleCompressedDiffInfo singleDiffInfo;
+    hpatch_windowDiffInfo winDiffInfo;
+    hpatch_TChecksum* checksumPlugin=0;
 #if (_IS_NEED_DIR_DIFF_PATCH)
     std::string  dirCompressType;
     TDirDiffInfo dirDiffInfo;
-    hpatch_TChecksum* checksumPlugin=0;
 #endif
     hpatch_TFileStreamInput  diffData_in;
     hpatch_TFileStreamOutput diffData_out;
@@ -1857,7 +1870,14 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
         printf("  resave as dir diffFile \n");
     }else
 #endif
-    if (getSingleCompressedDiffInfo(&singleDiffInfo,&diffData_in.base,0)){
+    if (getWindowDiffInfo(&winDiffInfo,&diffData_in.base,0)){
+        isWindowDiff=hpatch_TRUE;
+        diffInfo.newDataSize=winDiffInfo.newDataSize;
+        diffInfo.oldDataSize=winDiffInfo.oldDataSize;
+        diffInfo.compressedCount=(winDiffInfo.compressedSize>0)?1:0;
+        memcpy(diffInfo.compressType,winDiffInfo.compressType,hpatch_kMaxPluginTypeLength+1);
+        printf("  resave as window diffFile \n");
+    }else if (getSingleCompressedDiffInfo(&singleDiffInfo,&diffData_in.base,0)){
         isSingleDiff=hpatch_TRUE;
         _singleDiffInfoToHDiffInfo(&diffInfo,&singleDiffInfo);
         printf("  resave as single stream diffFile \n");
@@ -1889,6 +1909,13 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
                                 compressPlugin->compressTypeForDisplay():compressPlugin->compressType();
         printf("resave diffFile with compress plugin: \"%s\"\n",compressTypeTxt);
     }
+    if (isWindowDiff){ //checksumPlugin
+        if (strlen(winDiffInfo.checksumType)>0){
+            check(findChecksum(&checksumPlugin,winDiffInfo.checksumType), HDIFF_RESAVE_CHECKSUMTYPE_ERROR,
+                  "not found checksum plugin windowDiffFile used: \""+winDiffInfo.checksumType+"\"\n");
+        }
+        printf("resave windowDiffFile with checksum plugin: \"%s\"\n",winDiffInfo.checksumType);
+    }
 #if (_IS_NEED_DIR_DIFF_PATCH)
     if (isDirDiff){ //checksumPlugin
         if (strlen(dirDiffInfo.checksumType)>0){
@@ -1898,8 +1925,8 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
                   "found checksum plugin not same as dirDiffFile used: \""+dirDiffInfo.checksumType+"\"\n");
         }
         printf("resave dirDiffFile with checksum plugin: \"%s\"\n",dirDiffInfo.checksumType);
-    }else{
-        _options_check(checksumPlugin==0,"-C now only support dir diff");
+    }else if (!isWindowDiff){
+        _options_check(checksumPlugin==0,"-C now only support dir diff or window diff");
     }
 #endif
 
@@ -1914,7 +1941,10 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
                            &diffData_out.base,compressPlugin,checksumPlugin);
         }else
 #endif
-        if (isSingleDiff)
+        if (isWindowDiff)
+            resave_window_diff(&diffData_in.base,decompressPlugin,
+                              &diffData_out.base,compressPlugin,checksumPlugin);
+        else if (isSingleDiff)
             resave_single_compressed_diff(&diffData_in.base,decompressPlugin,
                                           &diffData_out.base,compressPlugin,&singleDiffInfo);
         else

@@ -290,7 +290,7 @@ private:
 struct TChecksumOutputStream:public hpatch_TStreamOutput{
     TChecksumOutputStream();
     void init(const hpatch_TStreamOutput* realOut,hpatch_TChecksum* checksumPlugin,
-              hpatch_checksumHandle checksumHandle,bool isChecksuming=false);
+              hpatch_checksumHandle checksumHandle,bool isChecksuming,hpatch_StreamPos_t realOut_offset=0);
     inline void setAutoChecksumBeginPos(hpatch_StreamPos_t autoBeginPos) { _autoChecksumBeginPos=autoBeginPos; }
     inline void setIsChecksuming(bool isChecksuming) { _isChecksuming=isChecksuming; }
 private:
@@ -298,6 +298,7 @@ private:
     hpatch_TChecksum*            _checksumPlugin;
     hpatch_checksumHandle        _checksumHandle;
     hpatch_StreamPos_t           _writePos;
+    hpatch_StreamPos_t           _realOut_offset;
     hpatch_StreamPos_t           _autoChecksumBeginPos;
     bool                         _isChecksuming;
     static hpatch_BOOL _write(const hpatch_TStreamOutput* stream,hpatch_StreamPos_t writeToPos,
@@ -307,7 +308,7 @@ private:
 struct TChecksumInputStream:public hpatch_TStreamInput{
     TChecksumInputStream();
     void init(const hpatch_TStreamInput* realIn,hpatch_TChecksum* checksumPlugin,
-              hpatch_checksumHandle checksumHandle,bool isChecksuming=false);
+              hpatch_checksumHandle checksumHandle,bool isChecksuming);
     inline void setIsChecksuming(bool isChecksuming) { _isChecksuming=isChecksuming; }
     inline void setIsRandomAccess(bool isRandomAccess) { _isRandomAccess=isRandomAccess; }
 private:

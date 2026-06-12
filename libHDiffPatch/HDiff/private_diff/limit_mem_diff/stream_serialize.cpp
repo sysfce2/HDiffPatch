@@ -956,7 +956,7 @@ void do_compress(std::vector<unsigned char>& out_code,const hpatch_TStreamInput*
 }
 
 TChecksumOutputStream::TChecksumOutputStream()
-:_realOut(0),_checksumPlugin(0),_checksumHandle(0),_writePos(0),
+:_realOut(0),_checksumPlugin(0),_checksumHandle(0),_writePos(0),_realOut_offset(0),
  _autoChecksumBeginPos(0),_isChecksuming(false){
     this->streamImport=this;
     this->streamSize=hpatch_kNullStreamPos;
@@ -965,13 +965,14 @@ TChecksumOutputStream::TChecksumOutputStream()
 }
 
 void TChecksumOutputStream::init(const hpatch_TStreamOutput* realOut,hpatch_TChecksum* checksumPlugin,
-                                 hpatch_checksumHandle checksumHandle,bool isChecksuming){
+                                 hpatch_checksumHandle checksumHandle,bool isChecksuming,hpatch_StreamPos_t realOut_offset){
     assert(realOut&&checksumPlugin&&checksumHandle);
     _realOut=realOut;
     _checksumPlugin=checksumPlugin;
     _checksumHandle=checksumHandle;
     _isChecksuming=isChecksuming;
     _writePos=0;
+    _realOut_offset=realOut_offset;
     this->streamImport=this;
     this->streamSize=realOut->streamSize;
     this->read_writed=0;
@@ -982,7 +983,7 @@ hpatch_BOOL TChecksumOutputStream::_write(const hpatch_TStreamOutput* stream,hpa
                                           const unsigned char* data,const unsigned char* data_end){
     TChecksumOutputStream* self=(TChecksumOutputStream*)stream->streamImport;
     hpatch_StreamPos_t writeEnd=writeToPos+(size_t)(data_end-data);
-    if (!self->_realOut->write(self->_realOut,writeToPos,data,data_end)) return hpatch_FALSE;
+    if (!self->_realOut->write(self->_realOut,self->_realOut_offset+writeToPos,data,data_end)) return hpatch_FALSE;
 
     if (self->_isChecksuming){
         if (self->_autoChecksumBeginPos==writeToPos){ //reset checksum

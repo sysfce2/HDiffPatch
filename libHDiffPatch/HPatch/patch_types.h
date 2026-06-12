@@ -368,6 +368,8 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_StreamPos_t  maxSubCoverCount;
         hpatch_StreamPos_t  maxWindowOldSize;
         hpatch_StreamPos_t  checksumByteSize;      //0=no checksum
+        hpatch_StreamPos_t  otherInfoPos;
+        hpatch_StreamPos_t  otherInfoEndPos;
         hpatch_StreamPos_t  extraDataSize;
         hpatch_StreamPos_t  uncompressedSize;      //windowDiffStreamSize
         hpatch_StreamPos_t  compressedSize;        //0=uncompressed, >0=compressed

@@ -2717,10 +2717,12 @@ static hpatch_BOOL _getWindowDiffInfo(hpatch_windowDiffInfo* out_diffInfo,
     _clip_unpackUIntTo(&out_diffInfo->extraDataSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->uncompressedSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->compressedSize,diffHeadClip);
-
-    hpatch_StreamPos_t extraBenginPos=kHeadPrefixSize+_TStreamCacheClip_readPosOfSrcStream(diffHeadClip);
-    if (extraBenginPos+out_diffInfo->checksumByteSize*3>out_diffInfo->windowDataPos)
+    
+    out_diffInfo->otherInfoPos=kHeadPrefixSize+_TStreamCacheClip_readPosOfSrcStream(diffHeadClip);
+    if (out_diffInfo->otherInfoPos+out_diffInfo->checksumByteSize*3>out_diffInfo->windowDataPos)
         return _hpatch_FALSE;
+    out_diffInfo->otherInfoEndPos=out_diffInfo->windowDataPos-out_diffInfo->checksumByteSize*3;
+
     if (((out_diffInfo->checksumType[0]==0)&&(out_diffInfo->checksumByteSize!=0))
       ||((out_diffInfo->checksumType[0]!=0)&&(out_diffInfo->checksumByteSize==0)))
         return _hpatch_FALSE;
