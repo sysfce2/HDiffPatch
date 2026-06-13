@@ -196,6 +196,10 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
     #   define hpatch_kWindowDiffHeadMaxSize   hpatch_kStreamCacheSize
     #endif
 
+    #ifndef hpatch_kMaxWindowMetaCount
+    #   define hpatch_kMaxWindowMetaCount    64     //must 2^N
+    #endif
+
     typedef struct hpatch_compressedDiffInfo{
         hpatch_StreamPos_t  newDataSize;
         hpatch_StreamPos_t  oldDataSize;
@@ -364,6 +368,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_StreamPos_t  oldDataSize;
         hpatch_StreamPos_t  coverCount;
         hpatch_StreamPos_t  windowCount;
+        hpatch_StreamPos_t  windowMetaCount;
         hpatch_StreamPos_t  maxStepMemSize;
         hpatch_StreamPos_t  maxSubCoverCount;
         hpatch_StreamPos_t  maxWindowOldSize;

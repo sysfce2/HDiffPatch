@@ -328,13 +328,13 @@ struct TWindowDiffStream:public hpatch_TStreamInput{
                       const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
                       size_t patchStepMemSize,bool isExtendCover,size_t& outMaxStepMemSize,
                       size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength,
-                      const unsigned char* extraData,size_t extraDataSize);
+                      hpatch_StreamPos_t windowMetaCount,const unsigned char* extraData,size_t extraDataSize);
     ~TWindowDiffStream();
 private:
     struct WindowData{
         std::vector<TCover>         adjustedCovers;
         hpatch_TWindow              adjustedWindow;
-        std::vector<unsigned char>  metadataBuf; // subCoverCount+oldPos+oldLength packed
+        std::vector<unsigned char>  metadataBuf; // packUInt(subCoverCount) only
         hpatch_StreamPos_t          stepDataSize;
         size_t                      subCoverCount;
     };
@@ -355,8 +355,15 @@ private:
     hpatch_StreamPos_t              _readFromPos_back;
     const unsigned char* const      _extraData;
     const size_t                    _extraDataSize;
+    hpatch_StreamPos_t                       _windowMetaCount;// metadata batch support
+    std::vector<std::vector<unsigned char> > _metaBatchDatas; // pre-packed batch data
+    std::vector<hpatch_StreamPos_t>          _metaBatchPositions;// stream pos of each batch
+    size_t                                   _nextMetaBatchIdx; // next batch to emit
     void _clear_windowStepStream();
     void _init_windowStepStream(size_t wi,bool isMustLoadOldToMem);
+    void _buildMetaBatches(const std::vector<hpatch_TWindow>& windows);
+    void _appendMetaBatch(const std::vector<hpatch_TWindow>& windows,
+                          size_t start,size_t count,hpatch_StreamPos_t& lastOldPos);
     static hpatch_BOOL _read(const hpatch_TStreamInput* stream,hpatch_StreamPos_t readFromPos,
                              unsigned char* out_data,unsigned char* out_data_end);
 };

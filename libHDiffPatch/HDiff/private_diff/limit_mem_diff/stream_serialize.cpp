@@ -1053,14 +1053,44 @@ hpatch_BOOL TChecksumInputStream::_read(const hpatch_TStreamInput* stream,hpatch
     return hpatch_TRUE;
 }
 
+void TWindowDiffStream::_appendMetaBatch(const std::vector<hpatch_TWindow>& windows,
+                                          size_t start,size_t count,hpatch_StreamPos_t& lastOldPos){
+    std::vector<unsigned char> batch;
+    for (size_t i=0;i<count;++i){
+        const hpatch_TWindow& w=windows[start+i];
+        int sign=(w.oldPos>=lastOldPos)?0:1;
+        hpatch_StreamPos_t delta=sign?(lastOldPos-w.oldPos):(w.oldPos-lastOldPos);
+        packUInt(batch,w.oldLength);
+        packUIntWithTag(batch,delta,sign,1);
+        lastOldPos=w.oldPos+w.oldLength;
+    }
+    _metaBatchDatas.push_back(batch);
+}
+
+void TWindowDiffStream::_buildMetaBatches(const std::vector<hpatch_TWindow>& windows){
+    const hpatch_StreamPos_t metaCount=_windowMetaCount;
+    const hpatch_StreamPos_t halfMetaCount=metaCount>>1;
+    hpatch_StreamPos_t lastOldPos=0;
+
+    {//batch 0: first min(metaCount, windows.size()) entries
+        size_t count=std::min((size_t)metaCount,windows.size());
+        _appendMetaBatch(windows,0,count,lastOldPos);
+    }
+    //subsequent batches: halfMetaCount entries each
+    for (size_t start=(size_t)metaCount;start<windows.size();start+=(size_t)halfMetaCount){
+        size_t count=std::min((size_t)halfMetaCount,windows.size()-start);
+        _appendMetaBatch(windows,start,count,lastOldPos);
+    }
+}
+
 TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const hpatch_TStreamInput* oldStream,
                                      const TInputCovers& covers,const std::vector<hpatch_TWindow>& windows,
                                      size_t patchStepMemSize,bool isExtendCover,size_t& outMaxStepMemSize,
                                      size_t& outMaxSubCoverCount,hpatch_StreamPos_t& outMaxWindowOldLength,
-                                     const unsigned char* extraData,size_t extraDataSize)
+                                     hpatch_StreamPos_t windowMetaCount,const unsigned char* extraData,size_t extraDataSize)
 :_newStream(newStream),_oldStream(oldStream),_patchStepMemSize(patchStepMemSize),_isExtendCover(isExtendCover),
  _curWindowIndex(0),_curMetadataPos(0),_curStepReadPos(0),_curStepStream(0),_readFromPos_back(0),
- _extraData(extraData),_extraDataSize(extraDataSize){
+ _extraData(extraData),_extraDataSize(extraDataSize),_windowMetaCount(windowMetaCount),_nextMetaBatchIdx(0){
     outMaxStepMemSize=0;
     outMaxSubCoverCount=0;
     outMaxWindowOldLength=0;
@@ -1072,7 +1102,6 @@ TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const 
 
     hpatch_StreamPos_t curNewPos=0;
     size_t coveri=0;
-    hpatch_StreamPos_t totalStreamSize=extraDataSize;
     const hpatch_StreamPos_t newDataSize=newStream->streamSize;
     for (size_t wi=0;wi<windows.size();++wi){
         WindowData& wd=_windowDatas[wi];
@@ -1108,14 +1137,10 @@ TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const 
         wd.stepDataSize=stepStream.streamSize;
         wd.subCoverCount=stepStream.getCoverCount();
 
-        {//pack metadata
-            wd.metadataBuf.clear();
-            packUInt(wd.metadataBuf,wd.subCoverCount);
-            packUInt(wd.metadataBuf,wd.adjustedWindow.oldPos);
-            packUInt(wd.metadataBuf,wd.adjustedWindow.oldLength);
-        }
+        //pack subCoverCount only (oldPos/oldLength moved to metadata batches)
+        wd.metadataBuf.clear();
+        packUInt(wd.metadataBuf,wd.subCoverCount);
 
-        totalStreamSize+=wd.metadataBuf.size()+wd.stepDataSize;
         outMaxStepMemSize=std::max(outMaxStepMemSize,stepStream.getMaxStepMemSize());
         outMaxSubCoverCount=std::max(outMaxSubCoverCount,wd.subCoverCount);
 
@@ -1126,8 +1151,36 @@ TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const 
     assert(curNewPos==newDataSize);
     _clear_windowStepStream();
 
+    //build metadata batches
+    _buildMetaBatches(windows);
+
+    //compute stream layout: interleave meta batches & window data groups
+    {
+        const hpatch_StreamPos_t halfMetaCount=_windowMetaCount>>1;
+        hpatch_StreamPos_t curPos=_extraDataSize;
+
+        //metadata batch 0
+        _metaBatchPositions.push_back(curPos);
+        curPos+=_metaBatchDatas[0].size();
+
+        for (size_t groupStart=0;groupStart<windows.size();groupStart+=(size_t)halfMetaCount){
+            size_t groupEnd=std::min(groupStart+(size_t)halfMetaCount,windows.size());
+
+            //window data in this group
+            for (size_t wi=groupStart;wi<groupEnd;++wi)
+                curPos+=_windowDatas[wi].metadataBuf.size()+_windowDatas[wi].stepDataSize;
+
+            //metadata batch after this group (if not last)
+            size_t nextBatchIdx=_metaBatchPositions.size();
+            if (nextBatchIdx<_metaBatchDatas.size()){
+                _metaBatchPositions.push_back(curPos);
+                curPos+=_metaBatchDatas[nextBatchIdx].size();
+            }
+        }
+        this->streamSize=curPos;
+    }
+
     this->streamImport=this;
-    this->streamSize=totalStreamSize;
     this->read=_read;
 }
 
@@ -1168,12 +1221,13 @@ hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_St
         self->_curWindowIndex=0;
         self->_curMetadataPos=0;
         self->_curStepReadPos=0;
+        self->_nextMetaBatchIdx=0;
         self->_clear_windowStepStream();
     }else{
         checki(self->_readFromPos_back==readFromPos,"TWindowDiffStream::read() readFromPos error!");
     }
     self->_readFromPos_back=readFromPos+(size_t)(out_data_end-out_data);
-    
+
     if (readFromPos<self->_extraDataSize){//read extraData
         size_t clen=self->_extraDataSize-readFromPos;
         clen=std::min(clen,(size_t)(out_data_end-out_data));
@@ -1183,16 +1237,32 @@ hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_St
     }
 
     while (out_data<out_data_end){
+        //check if readFromPos is inside a metadata batch
+        if (self->_nextMetaBatchIdx<self->_metaBatchPositions.size()){
+            hpatch_StreamPos_t batchPos=self->_metaBatchPositions[self->_nextMetaBatchIdx];
+            hpatch_StreamPos_t batchEnd=batchPos+self->_metaBatchDatas[self->_nextMetaBatchIdx].size();
+            if (readFromPos>=batchPos && readFromPos<batchEnd){
+                size_t len=(size_t)(batchEnd-readFromPos);
+                if (len>(size_t)(out_data_end-out_data)) len=(size_t)(out_data_end-out_data);
+                memcpy(out_data,self->_metaBatchDatas[self->_nextMetaBatchIdx].data()+(size_t)(readFromPos-batchPos),len);
+                out_data+=len;
+                readFromPos+=len;
+                if (readFromPos>=batchEnd) self->_nextMetaBatchIdx++;
+                continue;
+            }
+        }
+
         if (self->_curWindowIndex>=self->_windowDatas.size()) return hpatch_FALSE; //error
         const WindowData& wd=self->_windowDatas[self->_curWindowIndex];
 
-        //read metadata
+        //read subCoverCount
         if (self->_curMetadataPos<wd.metadataBuf.size()){
             size_t len=wd.metadataBuf.size()-self->_curMetadataPos;
             if (len>(size_t)(out_data_end-out_data)) len=(size_t)(out_data_end-out_data);
             memcpy(out_data,wd.metadataBuf.data()+self->_curMetadataPos,len);
             out_data+=len;
             self->_curMetadataPos+=len;
+            readFromPos+=len;
             continue;
         }
 
@@ -1209,6 +1279,7 @@ hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_St
                                             out_data,out_data+len)) return hpatch_FALSE;
             out_data+=len;
             self->_curStepReadPos+=len;
+            readFromPos+=len;
             continue;
         }
 

@@ -900,6 +900,19 @@ static hpatch_BOOL _covers_close_nil(hpatch_TCovers* covers){
     return hpatch_TRUE;
 }
 
+    static hpatch_BOOL _read_sign_pos_byLastPos(TStreamCacheClip* clip,hpatch_StreamPos_t* pLastOldPos){
+        hpatch_StreamPos_t absDelta;
+        const TByte* pSignByte=_TStreamCacheClip_accessData(clip,1);
+        if (!pSignByte) return _hpatch_FALSE;
+        hpatch_BOOL isNeg=((*pSignByte)>>(8-kSignTagBit));
+        _clip_unpackUIntWithTagTo(&absDelta,clip,kSignTagBit);
+        if (isNeg)
+            *pLastOldPos-=absDelta;
+        else
+            *pLastOldPos+=absDelta;
+        return hpatch_TRUE;
+    }
+
 static  hpatch_BOOL _covers_read_cover(hpatch_TCovers* covers,hpatch_TCover* out_cover){
     _TCovers* self=(_TCovers*)covers;
     hpatch_StreamPos_t oldPosBack=self->oldPosBack;
@@ -911,24 +924,17 @@ static  hpatch_BOOL _covers_read_cover(hpatch_TCovers* covers,hpatch_TCover* out
         return _hpatch_FALSE;
     
     {
-        hpatch_StreamPos_t copyLength,coverLength, oldPos,inc_oldPos;
-        TByte inc_oldPos_sign;
-        const TByte* pSign=_TStreamCacheClip_accessData(self->code_inc_oldPosClip,1);
-        if (pSign)
-            inc_oldPos_sign=(*pSign)>>(8-kSignTagBit);
-        else
+        hpatch_StreamPos_t copyLength,coverLength;
+        if (!_read_sign_pos_byLastPos(self->code_inc_oldPosClip,&oldPosBack))
             return _hpatch_FALSE;
-        _clip_unpackUIntWithTagTo(&inc_oldPos,self->code_inc_oldPosClip,kSignTagBit);
-        oldPos=(inc_oldPos_sign==0)?(oldPosBack+inc_oldPos):(oldPosBack-inc_oldPos);
         _clip_unpackUIntTo(&copyLength,self->code_inc_newPosClip);
         _clip_unpackUIntTo(&coverLength,self->code_lengthsClip);
         newPosBack+=copyLength;
-        oldPosBack=oldPos;
-        oldPosBack+=(self->isOldPosBackNeedAddLength)?coverLength:0;
         
-        out_cover->oldPos=oldPos;
+        out_cover->oldPos=oldPosBack;
         out_cover->newPos=newPosBack;
         out_cover->length=coverLength;
+        oldPosBack+=(self->isOldPosBackNeedAddLength)?coverLength:0;
         newPosBack+=coverLength;
     }
     self->oldPosBack=oldPosBack;
@@ -2710,6 +2716,7 @@ static hpatch_BOOL _getWindowDiffInfo(hpatch_windowDiffInfo* out_diffInfo,
     _clip_unpackUIntTo(&out_diffInfo->oldDataSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->coverCount,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->windowCount,diffHeadClip);
+    _clip_unpackUIntTo(&out_diffInfo->windowMetaCount,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->maxStepMemSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->maxSubCoverCount,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->maxWindowOldSize,diffHeadClip);
@@ -2723,6 +2730,10 @@ static hpatch_BOOL _getWindowDiffInfo(hpatch_windowDiffInfo* out_diffInfo,
         return _hpatch_FALSE;
     out_diffInfo->otherInfoEndPos=out_diffInfo->windowDataPos-out_diffInfo->checksumByteSize*3;
 
+    if ((out_diffInfo->windowMetaCount>hpatch_kMaxWindowMetaCount)||(out_diffInfo->windowMetaCount<2))
+        return _hpatch_FALSE;
+    if ((out_diffInfo->windowMetaCount&(out_diffInfo->windowMetaCount-1))!=0) //2^N
+        return _hpatch_FALSE;
     if (((out_diffInfo->checksumType[0]==0)&&(out_diffInfo->checksumByteSize!=0))
       ||((out_diffInfo->checksumType[0]!=0)&&(out_diffInfo->checksumByteSize==0)))
         return _hpatch_FALSE;
@@ -2793,22 +2804,43 @@ static const size_t kWindowCacheCount=_kCacheSgCount;
         return hpatch_TRUE;
     }
 
+    static hpatch_BOOL _read_meta_batch(TStreamCacheClip* clip,hpatch_StreamPos_t* pLastOldPos,
+                                        hpatch_StreamPos_t* metaOldPos,hpatch_StreamPos_t* metaOldLen,
+                                        hpatch_size_t writeIdx,hpatch_size_t batchSize){
+        hpatch_StreamPos_t lastOldPos=*pLastOldPos;
+        hpatch_size_t i;
+        for (i=0;i<batchSize;++i){
+            _clip_unpackUIntTo(&metaOldLen[writeIdx+i],clip);
+            if (!_read_sign_pos_byLastPos(clip,&lastOldPos)) return _hpatch_FALSE;
+            metaOldPos[writeIdx+i]=lastOldPos;
+            lastOldPos+=metaOldLen[writeIdx+i];
+        }
+        *pLastOldPos=lastOldPos;
+        return hpatch_TRUE;
+    }
+
 static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,const hpatch_TStreamInput* oldData,
                                       const hpatch_TStreamInput* uncompressedDiffData,hpatch_StreamPos_t diffData_pos,
                                       hpatch_StreamPos_t diffData_posEnd,const hpatch_windowDiffInfo* diffInfo,
                                       hpatch_TChecksum* checksumPlugin,hpatch_checksumHandle checksumHandle_old,
                                       unsigned char* temp_cache,unsigned char* temp_cache_end,hpatch_BOOL isNeedOutCache){
-    const hpatch_size_t windowOldBufSize=(hpatch_size_t)diffInfo->maxWindowOldSize;
-    const hpatch_size_t stepMemSize=(hpatch_size_t)diffInfo->maxStepMemSize;
-    const size_t        kCacheCount=kWindowCacheCount-(isNeedOutCache?0:1);
-    unsigned char*      oldBuf;
-    unsigned char*      step_cache;
-    hpatch_size_t       cacheSize;
-    TStreamCacheClip    mainClip;
-    _TOutStreamCache    outCache;
-    hpatch_StreamPos_t  lastOldPos=0;
-    hpatch_StreamPos_t  lastOldEnd=0;
-    hpatch_StreamPos_t  wi;
+    const hpatch_size_t    windowOldBufSize=(hpatch_size_t)diffInfo->maxWindowOldSize;
+    const hpatch_size_t    stepMemSize=(hpatch_size_t)diffInfo->maxStepMemSize;
+    const size_t           kCacheCount=kWindowCacheCount-(isNeedOutCache?0:1);
+    const hpatch_StreamPos_t windowCount=diffInfo->windowCount;
+    const hpatch_StreamPos_t metaCount=diffInfo->windowMetaCount;
+    unsigned char*         oldBuf;
+    unsigned char*         step_cache;
+    hpatch_size_t          cacheSize;
+    TStreamCacheClip       mainClip;
+    _TOutStreamCache       outCache;
+    hpatch_StreamPos_t     lastOldPos=0;
+    hpatch_StreamPos_t     lastOldEnd=0;
+    hpatch_StreamPos_t     lastOldPosForMeta=0;  // running oldPos for delta decoding
+    hpatch_StreamPos_t     loadedMetaEnd=0;
+    hpatch_StreamPos_t     metaOldPos[hpatch_kMaxWindowMetaCount];
+    hpatch_StreamPos_t     metaOldLen[hpatch_kMaxWindowMetaCount];
+    hpatch_StreamPos_t     wi;
     assert(out_newData!=0);
     assert(out_newData->write!=0);
     assert(oldData!=0);
@@ -2833,15 +2865,30 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
     _TOutStreamCache_init(&outCache,out_newData,isNeedOutCache?(temp_cache+cacheSize):0,isNeedOutCache?cacheSize:0);
 
     //process each window
-    for (wi=0; wi<diffInfo->windowCount; ++wi){
+    for (wi=0; wi<windowCount; ++wi){
         hpatch_StreamPos_t subCoverCount;
         hpatch_StreamPos_t windowOldPos;
         hpatch_StreamPos_t windowOldLength;
         hpatch_TStreamInput oldMemStream;
-        //read window metadata
+
+        //after each (metaCount>>1) windows, read next metadata batch
+        if ((((wi)&((metaCount>>1)-1))==0) && (loadedMetaEnd<windowCount)){
+            hpatch_StreamPos_t savedMetaCount=(wi==0)?metaCount:(metaCount>>1);
+            hpatch_size_t      writeIdx=(hpatch_size_t)(loadedMetaEnd & (metaCount-1));
+            hpatch_StreamPos_t batchSize=windowCount-loadedMetaEnd;
+            if (batchSize>savedMetaCount) batchSize=savedMetaCount;
+            if (!_read_meta_batch(&mainClip,&lastOldPosForMeta,metaOldPos,metaOldLen,writeIdx,(hpatch_size_t)batchSize))
+                return _hpatch_FALSE;
+            loadedMetaEnd+=batchSize;
+        }
+
+        //read subCoverCount (still inline before each window's step data)
         _clip_unpackUIntTo(&subCoverCount,&mainClip);
-        _clip_unpackUIntTo(&windowOldPos,&mainClip);
-        _clip_unpackUIntTo(&windowOldLength,&mainClip);
+        {//look up oldPos/oldLength from ring buffer
+            hpatch_size_t metaIdx=(hpatch_size_t)(wi & (metaCount-1));
+            windowOldPos   =metaOldPos[metaIdx];
+            windowOldLength=metaOldLen[metaIdx];
+        }
 #if (defined __RUN_MEM_SAFE_CHECK)
         if (windowOldPos>oldData->streamSize) return _hpatch_FALSE;
         if (windowOldLength>diffInfo->maxWindowOldSize) return _hpatch_FALSE;

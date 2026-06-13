@@ -2242,6 +2242,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
     }
 
     //create window diff data stream (init pass: compute sizes & stats)
+    const size_t windowMetaCount=hpatch_kMaxWindowMetaCount; //2^N, >=2 & <= hpatch_kMaxWindowMetaCount
     size_t maxStepMemSize=0;
     size_t maxSubCoverCount=0;
     hpatch_StreamPos_t maxWindowOldSize=0;
@@ -2251,7 +2252,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
                                        (checksumByteSize>0)?&checksumInOld:oldStream,
                                        covers,windows,patchStepMemSize,isExtendCover,
                                        maxStepMemSize,maxSubCoverCount,maxWindowOldSize,
-                                       extraData,extraDataSize);
+                                       windowMetaCount,extraData,extraDataSize);
 
     TDiffStream outDiff((checksumByteSize>0)?&checksumOutDiff:out_diff);
     TPlaceholder headSize_ph(0,0);
@@ -2274,6 +2275,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
     outDiff.packUInt(oldStream->streamSize);
     outDiff.packUInt(covers.size());
     outDiff.packUInt(windows.size());
+    outDiff.packUInt(windowMetaCount);
     outDiff.packUInt(maxStepMemSize);
     outDiff.packUInt(maxSubCoverCount);
     outDiff.packUInt(maxWindowOldSize);
