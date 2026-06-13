@@ -441,16 +441,26 @@ static const size_t kDiffTypeCount=kHSynz+1;
 
 #ifdef _AttackPacth_ON
 
+static unsigned char* _get_temp_cache(size_t temp_cache_size){
+    static TAutoMem _buf;
+    if (_buf.size()<temp_cache_size){
+        try{
+            _buf.realloc(temp_cache_size);
+        } catch (std::exception& e){
+            return 0;
+        }
+    }
+    return _buf.data();
+}
+
 hpatch_BOOL _sspatch_onDiffInfo(struct sspatch_listener_t* listener,
                                 const hpatch_singleCompressedDiffInfo* info,
                                 hpatch_TDecompress** out_decompressPlugin,
                                 unsigned char** out_temp_cache,
                                 unsigned char** out_temp_cacheEnd){
     size_t temp_cache_size=info->stepMemSize+hpatch_kFileIOBufBetterSize*3;
-    static TAutoMem _buf;
-    if (_buf.size()<temp_cache_size)
-        _buf.realloc(temp_cache_size);
-    unsigned char* temp_cache=_buf.data();
+    unsigned char* temp_cache=_get_temp_cache(temp_cache_size);
+    if (temp_cache==0) return hpatch_FALSE;
     *out_temp_cache=temp_cache;
     *out_temp_cacheEnd=temp_cache+temp_cache_size;
     *out_decompressPlugin=decompressPlugin;
@@ -465,10 +475,8 @@ static hpatch_BOOL _winpatch_onDiffInfo(struct winpatch_listener_t* listener,
                                          unsigned char** out_temp_cache,
                                          unsigned char** out_temp_cacheEnd){
     size_t temp_cache_size=(size_t)(info->maxWindowOldSize+info->maxStepMemSize)+hpatch_kFileIOBufBetterSize*3;
-    TAutoMem& _buf=*(TAutoMem*)listener->import;
-    if (_buf.size()<temp_cache_size)
-        _buf.realloc(temp_cache_size);
-    unsigned char* temp_cache=_buf.data();
+    unsigned char* temp_cache=_get_temp_cache(temp_cache_size);
+    if (temp_cache==0) return hpatch_FALSE;
     *out_temp_cache=temp_cache;
     *out_temp_cacheEnd=temp_cache+temp_cache_size;
     *out_decompressPlugin=decompressPlugin;
@@ -537,7 +545,7 @@ struct TPatchiListener:public hpatchi_listener_t{
 };
 
 
-long attackPacth(TByte* out_newData,TByte* out_newData_end,
+long _attackPacth(TByte* out_newData,TByte* out_newData_end,
                         const TByte* oldData,const TByte* oldData_end,
                         const TByte* diffData,const TByte* diffData_end,
                         const char* error_tag,TDiffType diffType){
@@ -570,8 +578,7 @@ long attackPacth(TByte* out_newData,TByte* out_newData_end,
             _hsynz_sync_patch(out_newData,out_newData_end,oldData,oldData_end);
         } break;
         case kDiffW: {
-            TAutoMem  _buf;
-            winpatch_listener_t listener={&_buf,_winpatch_onDiffInfo,0};
+            winpatch_listener_t listener={0,_winpatch_onDiffInfo,0};
             struct hpatch_TStreamOutput out_newStream;
             struct hpatch_TStreamInput  oldStream;
             struct hpatch_TStreamInput  diffStream;
@@ -628,7 +635,7 @@ long attackPacth(TInt newSize,const TByte* oldData,const TByte* oldData_end,
             for (int r=0; r<randCount; ++r)
                 diffData[_rand()%diffSize]=_rand();
 
-            exceptionCount+=attackPacth(newData,newData_end,oldData,oldData_end,diffData,diffData_end,tag,diffType);
+            exceptionCount+=_attackPacth(newData,newData_end,oldData,oldData_end,diffData,diffData_end,tag,diffType);
         }
         return exceptionCount;
     } catch (...) {
@@ -803,7 +810,8 @@ long test(const TByte* newData,const TByte* newData_end,
 #ifdef _AttackPacth_ON
             long exceptionCount=attackPacth(newData_end-newData,oldData,oldData_end,
                                             diffData.data(),diffData.data()+diffData.size(),_rand(),kDiffW);
-            if (exceptionCount>0) return exceptionCount;
+            if (exceptionCount>0)
+                return exceptionCount;
 #endif
         }
     }

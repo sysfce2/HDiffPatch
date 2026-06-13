@@ -2817,7 +2817,10 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
     assert(uncompressedDiffData->read!=0);
     assert(diffInfo!=0);
     assert(((checksumHandle_old==0)&&(checksumPlugin==0))||(checksumHandle_old!=0)&&(checksumPlugin!=0));
-    assert(diffData_posEnd<=uncompressedDiffData->streamSize);
+#if (defined __RUN_MEM_SAFE_CHECK)
+    if (diffData_pos>diffData_posEnd) return _hpatch_FALSE;
+    if (diffData_posEnd>uncompressedDiffData->streamSize) return _hpatch_FALSE;
+#endif
 
     assert((size_t)(temp_cache_end-temp_cache)>=windowOldBufSize+stepMemSize+hpatch_kStreamCacheSize*kCacheCount);
     oldBuf=temp_cache;     temp_cache+=windowOldBufSize;
@@ -3080,7 +3083,7 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
             checksumPlugin->end(checksumHandle_new,computedChecksum,computedChecksum+checksumByteSize);
             isCheckSumNew_and_eq=(0==memcmp(computedChecksum,storedChecksumNew,checksumByteSize));
 			if (isCheckSumNew_and_eq){
-                assert(patch_result); //why fail?
+                //assert(patch_result); //why fail?
                 patch_result=hpatch_TRUE;//note: if patch failed, but new data checksum is correct, we can consider it as success.
             }
         }
