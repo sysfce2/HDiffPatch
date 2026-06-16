@@ -232,6 +232,8 @@ hpatch_BOOL _patch_cache_all_old(const hpatch_TStreamInput** poldData,size_t kMi
 #if (_IS_NEED_CACHE_OLD_BY_COVERS)
 
 hpatch_size_t _patch_step_cache_old_canUsedSize(hpatch_size_t stepCoversMemSize,hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize);
+hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
+                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize);
 
 // try cache part of oldData, used by patch_single_stream_diff()
 hpatch_BOOL _patch_step_cache_old(const hpatch_TStreamInput** poldData,hpatch_StreamPos_t newDataSize,size_t stepCoversMemSize,

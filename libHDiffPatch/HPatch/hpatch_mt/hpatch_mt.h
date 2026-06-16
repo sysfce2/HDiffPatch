@@ -52,10 +52,12 @@ hpatchMTSets_t hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t ol
                                size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets){
 #if (_IS_USED_MULTITHREAD)
     hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,hpatch_StreamPos_t diffSize,
-                                    const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,size_t stepMemSize,
-                                    size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets);
+                                     const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,
+                                     hpatch_size_t windowOldBufSize,size_t stepMemSize,
+                                     size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets,hpatch_BOOL isWindow);
     if (maxThreadNum<=1) return hpatchMTSets_no;
-    return _hpatch_getMTSets(newSize,oldSize,diffSize,decompressPlugin,kCacheCount,stepMemSize,temp_cacheSumSize,maxThreadNum,mtsets);
+    return _hpatch_getMTSets(newSize,oldSize,diffSize,decompressPlugin,kCacheCount,0,stepMemSize,
+                             temp_cacheSumSize,maxThreadNum,mtsets,hpatch_FALSE);
 #else
     return hpatchMTSets_no;
 #endif
@@ -101,6 +103,41 @@ struct hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** 
                                                    hpatchMTSets_t               mtsets);
 
 hpatch_BOOL                 hpatch_mt_manager_close(struct hpatch_mt_manager_t* self,hpatch_BOOL isOnError);
+
+
+
+struct hpatch_mt_manager_win_t;
+struct hcache_window_old_mt_t;
+
+static hpatch_force_inline 
+hpatchMTSets_t hpatch_getMTSets_win(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,hpatch_StreamPos_t diffSize,
+                                    const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,
+                                    hpatch_size_t windowOldBufSize, hpatch_size_t stepMemSize,
+                                    size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets){
+#if (_IS_USED_MULTITHREAD)
+    if (maxThreadNum<=1) return hpatchMTSets_no;
+    hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,hpatch_StreamPos_t diffSize,
+                                     const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,
+                                     hpatch_size_t windowOldBufSize,size_t stepMemSize,
+                                     size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets,hpatch_BOOL isWindow);
+    return _hpatch_getMTSets(newSize,oldSize,diffSize,decompressPlugin,kCacheCount,windowOldBufSize,stepMemSize,
+                             temp_cacheSumSize,maxThreadNum,mtsets,hpatch_TRUE);
+#else
+    return hpatchMTSets_no;
+#endif
+}
+
+struct hpatch_mt_manager_win_t* hpatch_mt_manager_win_open(const hpatch_TStreamOutput** pout_newData,
+            const hpatch_TStreamInput**  poldData,const hpatch_TStreamInput**     pwindowDiffStream,
+            hpatch_StreamPos_t*          pdiffData_pos, hpatch_StreamPos_t*       pdiffData_posEnd,
+            hpatch_StreamPos_t           uncompressedSize, hpatch_TDecompress**   pdecompressPlugin,
+            hpatch_StreamPos_t windowCount,hpatch_size_t windowOldBufSize, hpatch_size_t stepMemSize,
+            unsigned char**              ptemp_cache, unsigned char**             ptemp_cache_end,
+            size_t                       kCacheCount, hpatchMTSets_t              mtsets);
+
+struct hcache_window_old_mt_t* hpatch_mt_manager_win_oldCache(struct hpatch_mt_manager_win_t* self);
+
+hpatch_BOOL hpatch_mt_manager_win_close(struct hpatch_mt_manager_win_t* self,hpatch_BOOL isOnError);
 
 #endif // _IS_USED_MULTITHREAD
 

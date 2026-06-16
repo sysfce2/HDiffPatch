@@ -32,6 +32,7 @@
 #if (_IS_USED_MULTITHREAD)
 #include "_patch_private_mt.h"
 #include "_hcache_old_mt.h"
+#include "_hcache_window_old_mt.h"
 #include "_hinput_mt.h"
 #include "_houtput_mt.h"
 #include "_hpatch_mt.h"
@@ -43,7 +44,7 @@
     const size_t kMinBufNodeSize=hpatch_kStreamCacheSize;
     const size_t kBetterBufNodeSize=hpatch_kFileIOBufBetterSize;
     const size_t kObjNodeCount=2;
-    static size_t _getObjsMemSize(hpatchMTSets_t mtsets,size_t* pworkBufCount);
+    static size_t _getObjsMemSize_base(hpatchMTSets_t mtsets,size_t* pworkBufCount,hpatch_BOOL isWindow);
 
     // [writeNew,readOld,readDiff,decompressDiff]
     typedef hpatch_byte disThreads_t[4];
@@ -128,8 +129,9 @@
     }
 
 hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t oldSize,hpatch_StreamPos_t diffSize,
-                                const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,size_t stepMemSize,
-                                size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets){
+                                const hpatch_TDecompress* decompressPlugin,size_t kCacheCount,
+                                hpatch_size_t windowOldBufSize,size_t stepMemSize,
+                                size_t temp_cacheSumSize,size_t maxThreadNum,hpatchMTSets_t mtsets,hpatch_BOOL isWindow){
     hpatch_uint64_t writeNewTime,readOldTime,readDiffTime,decompressTime,patchTime;
     hpatch_uint64_t readOldSpeed=25;
     assert(sizeof(disThreads_t)==sizeof(hpatchMTSets_t));
@@ -143,21 +145,29 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
     if (mtsets.readOld_isMT){// is can cache all old?
         size_t workBufCount,objsMemSize,kMinTempCacheSize;
         hpatchMTSets_t _mtsets=mtsets; _mtsets.readOld_isMT=0;
-        objsMemSize=_getObjsMemSize(_mtsets,&workBufCount);
+        objsMemSize=_getObjsMemSize_base(_mtsets,&workBufCount,isWindow);
         kMinTempCacheSize=objsMemSize+kMinBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
-        if (_patch_is_can_cache_all_old(oldSize,stepMemSize+kMinTempCacheSize,temp_cacheSumSize)){
-            mtsets.readOld_isMT=0; //old data will load in memery, no need MT.
-            readOldSpeed*=1000; //old in memory
-        }
-    #if (_IS_NEED_CACHE_OLD_BY_COVERS)
-        else{ //is can cache part of old by step?
+        if (!isWindow){
+            assert(windowOldBufSize==0);
+            if (_patch_is_can_cache_all_old(oldSize,stepMemSize+kMinTempCacheSize,temp_cacheSumSize)){
+                mtsets.readOld_isMT=0; //old data will load in memery, no need MT.
+                readOldSpeed*=1000; //old in memory
+            }
+          #if (_IS_NEED_CACHE_OLD_BY_COVERS)
+            else{ //is can cache part of old by step?
+                kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
+                if (_patch_step_cache_old_canUsedSize(stepMemSize,kMinTempCacheSize,temp_cacheSumSize)>0){
+                    mtsets.readOld_isMT=0; // not use MT.
+                    readOldSpeed*=2; //cache part of old by step
+                }
+            }
+          #endif // _IS_NEED_CACHE_OLD_BY_COVERS
+        }else{
             kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
-            if (_patch_step_cache_old_canUsedSize(stepMemSize,kMinTempCacheSize,temp_cacheSumSize)>0){
+            if (!_patch_is_can_cache_window_old_canUsedSize(windowOldBufSize,stepMemSize,kMinTempCacheSize,temp_cacheSumSize)>0){
                 mtsets.readOld_isMT=0; // not use MT.
-                readOldSpeed*=2; //cache part of old by step
             }
         }
-    #endif // _IS_NEED_CACHE_OLD_BY_COVERS
     }else{
         readOldSpeed*=1000; //old in memory
     }
@@ -203,43 +213,58 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
     return mtsets;
 }
 
-
-typedef struct hpatch_mt_manager_t{
+typedef struct _mt_manager_base_t{
     struct hpatch_mt_t*     h_mt;
     hpatch_TStreamOutput*   newData;
-    hpatch_TStreamInput*    oldData;
     hpatch_TStreamInput*    diffData;
     hpatch_TStreamInput*    decDiffData;
+    void*                   _old;
+} _mt_manager_base_t;
+
+typedef struct hpatch_mt_manager_t{
+    _mt_manager_base_t      base;
 } hpatch_mt_manager_t;
 
-static size_t _getObjsMemSize(hpatchMTSets_t mtsets,size_t* pworkBufCount){
+//assert(sizeof(_mt_manager_base_t)==sizeof(hpatch_mt_manager_t));
+struct __private_hpatch_check_hpatch_mt_manager_t_size {
+    char _h[(sizeof(_mt_manager_base_t)==sizeof(hpatch_mt_manager_t))?1:-1];};
+
+
+static size_t _getObjsMemSize_base(hpatchMTSets_t mtsets,size_t* pworkBufCount,hpatch_BOOL isWindow){
     size_t threadNum=_hpatchMTSets_threadNum(mtsets);
     size_t objsMemSize=0;
 
-    *pworkBufCount=kObjNodeCount*(threadNum-1);
-    objsMemSize+=_hpatch_align_upper(sizeof(hpatch_mt_manager_t),kAlignSize);
+    *pworkBufCount=kObjNodeCount*(threadNum-1-((isWindow&&mtsets.readOld_isMT)?1:0));
+    objsMemSize+=_hpatch_align_upper(sizeof(_mt_manager_base_t),kAlignSize);
     objsMemSize+=_hpatch_align_upper(hpatch_mt_t_memSize(threadNum),kAlignSize);
     objsMemSize+=mtsets.readDiff_isMT       ?_hpatch_align_upper(hinput_mt_t_memSize(),kAlignSize):0;
     objsMemSize+=mtsets.decompressDiff_isMT ?_hpatch_align_upper(hinput_mt_t_memSize(),kAlignSize):0;
-    objsMemSize+=mtsets.readOld_isMT        ?_hpatch_align_upper(hcache_old_mt_t_memSize(),kAlignSize):0;
     objsMemSize+=mtsets.writeNew_isMT       ?_hpatch_align_upper(houtput_mt_t_memSize(),kAlignSize):0;
+    if (!isWindow)
+        objsMemSize+=mtsets.readOld_isMT    ?_hpatch_align_upper(hcache_old_mt_t_memSize(),kAlignSize):0;
+    else
+        objsMemSize+=mtsets.readOld_isMT    ?_hpatch_align_upper(hcache_window_old_mt_t_memSize(),kAlignSize):0;
     return objsMemSize;
 }
 
+hpatch_BOOL _mt_manager_base_close(struct _mt_manager_base_t* self,hpatch_BOOL isOnError,hpatch_BOOL isWindow);
 
-hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** pout_newData,
+static _mt_manager_base_t* _mt_manager_base_open(const hpatch_TStreamOutput** pout_newData,
                                             const hpatch_TStreamInput**  poldData,
                                             const hpatch_TStreamInput**  psingleCompressedDiff,
                                             hpatch_StreamPos_t*          pdiffData_pos,
                                             hpatch_StreamPos_t*          pdiffData_posEnd,
                                             hpatch_StreamPos_t           uncompressedSize,
                                             hpatch_TDecompress**         pdecompressPlugin,
+                                            hpatch_size_t                windowOldBufSize,
                                             size_t                       stepMemSize,
+                                            hpatch_StreamPos_t           windowCount,
                                             hpatch_byte** ptemp_cache,hpatch_byte** ptemp_cache_end,
                                             sspatch_coversListener_t**   pcoversListener,
                                             hpatch_BOOL                  isOnStepCoversInThread,
                                             size_t                       kCacheCount,
-                                            hpatchMTSets_t               mtsets){
+                                            hpatchMTSets_t               mtsets,
+                                            hpatch_BOOL                  isWindow){
     size_t         objsMemSize;
     size_t         workBufCount;
     size_t         workBufNodeSize;
@@ -248,36 +273,46 @@ hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** pout_ne
     hpatch_byte* temp_cache_end=*ptemp_cache_end;
     hpatch_byte* wbufsMem=0;
     hpatch_size_t workBufSize;
-    hpatch_mt_manager_t* self=0;
+    _mt_manager_base_t* self=0;
     const size_t threadNum=_hpatchMTSets_threadNum(mtsets);
     assert(threadNum>1);
-    objsMemSize =_getObjsMemSize(mtsets,&workBufCount);
+    objsMemSize =_getObjsMemSize_base(mtsets,&workBufCount,isWindow);
     kMinTempCacheSize=objsMemSize+kMinBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
-    if (stepMemSize+kMinTempCacheSize>(hpatch_size_t)(temp_cache_end-temp_cache)) return 0;
-    if (!mtsets.readOld_isMT){
-        if (_patch_is_can_cache_all_old((*poldData)->streamSize,stepMemSize+kMinTempCacheSize,temp_cache_end-temp_cache)){
-            size_t cacheAllNeedSize=(size_t)_patch_cache_all_old_needSize((*poldData)->streamSize,0);
-            temp_cache_end-=cacheAllNeedSize; // patch_single_stream_diff() will load all old data into memory 
+    if ((windowOldBufSize+stepMemSize)+kMinTempCacheSize>(hpatch_size_t)(temp_cache_end-temp_cache)) return 0;
+    if (!isWindow){
+        assert(windowOldBufSize==0);
+        if (!mtsets.readOld_isMT){
+            if (_patch_is_can_cache_all_old((*poldData)->streamSize,stepMemSize+kMinTempCacheSize,temp_cache_end-temp_cache)){
+                size_t cacheAllNeedSize=(size_t)_patch_cache_all_old_needSize((*poldData)->streamSize,0);
+                temp_cache_end-=cacheAllNeedSize; // patch_single_stream_diff() will load all old data into memory 
+            }
+        #if (_IS_NEED_CACHE_OLD_BY_COVERS)
+            else{
+                size_t cacheStepNeedSize;
+                kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
+                cacheStepNeedSize=_patch_step_cache_old_canUsedSize(stepMemSize,kMinTempCacheSize,temp_cache_end-temp_cache);
+                if (cacheStepNeedSize>0)
+                    temp_cache_end-=cacheStepNeedSize; // patch_single_stream_diff() will cache part of old by step
+            }
+        #endif // _IS_NEED_CACHE_OLD_BY_COVERS
         }
-    #if (_IS_NEED_CACHE_OLD_BY_COVERS)
-        else{
-            size_t cacheStepNeedSize;
+    }else{
+        if (mtsets.readOld_isMT){
+            assert(windowOldBufSize>0);
             kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
-            cacheStepNeedSize=_patch_step_cache_old_canUsedSize(stepMemSize,kMinTempCacheSize,temp_cache_end-temp_cache);
-            if (cacheStepNeedSize>0)
-                temp_cache_end-=cacheStepNeedSize; // patch_single_stream_diff() will cache part of old by step
+            windowOldBufSize=_patch_is_can_cache_window_old_canUsedSize(windowOldBufSize,stepMemSize,kMinTempCacheSize,(temp_cache_end-temp_cache));
+            assert(windowOldBufSize>0);
         }
-    #endif // _IS_NEED_CACHE_OLD_BY_COVERS
     }
     {
-        size_t memCacheSize=(temp_cache_end-temp_cache)-objsMemSize-stepMemSize;
+        size_t memCacheSize=(temp_cache_end-temp_cache)-objsMemSize-(windowOldBufSize+stepMemSize);
         workBufNodeSize=memCacheSize/(workBufCount+kCacheCount)/kAlignSize*kAlignSize;
         workBufSize=TWorkBuf_getWorkBufSize(workBufNodeSize);
     }
    
-    self=(hpatch_mt_manager_t*)_hpatch_align_upper(temp_cache,kAlignSize);
+    self=(_mt_manager_base_t*)_hpatch_align_upper(temp_cache,kAlignSize);
     memset(self,0,sizeof(*self));
-    temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+sizeof(hpatch_mt_manager_t),kAlignSize);
+    temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+sizeof(_mt_manager_base_t),kAlignSize);
 
     self->h_mt=hpatch_mt_open(temp_cache,hpatch_mt_t_memSize(threadNum),threadNum);
     if (self->h_mt==0) goto _on_error;
@@ -306,16 +341,6 @@ hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** pout_ne
         *pdecompressPlugin=0;
         temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+hinput_mt_t_memSize(),kAlignSize);
     }
-    if (mtsets.readOld_isMT){
-        sspatch_coversListener_t* out_coversListener=0;
-        self->oldData=hcache_old_mt_open(temp_cache,hcache_old_mt_t_memSize(),self->h_mt,
-                                         TWorkBuf_allocFreeList(&wbufsMem,kObjNodeCount,workBufNodeSize),workBufSize,
-                                         *poldData,&out_coversListener,*pcoversListener,isOnStepCoversInThread);
-        if (self->oldData==0) goto _on_error;
-        *poldData=self->oldData;
-        *pcoversListener=out_coversListener;
-        temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+hcache_old_mt_t_memSize(),kAlignSize);
-    }
     if (mtsets.writeNew_isMT){
         self->newData=houtput_mt_open(temp_cache,houtput_mt_t_memSize(),self->h_mt,
                                       TWorkBuf_allocFreeList(&wbufsMem,kObjNodeCount,workBufNodeSize),workBufSize,
@@ -324,25 +349,101 @@ hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** pout_ne
         *pout_newData=self->newData;
         temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+houtput_mt_t_memSize(),kAlignSize);
     }
-
+    if (mtsets.readOld_isMT){
+        if (!isWindow){
+            sspatch_coversListener_t* out_coversListener=0;
+            self->_old=hcache_old_mt_open(temp_cache,hcache_old_mt_t_memSize(),self->h_mt,
+                                          TWorkBuf_allocFreeList(&wbufsMem,kObjNodeCount,workBufNodeSize),workBufSize,
+                                          *poldData,&out_coversListener,*pcoversListener,isOnStepCoversInThread);
+            if (self->_old==0) goto _on_error;
+            *poldData=(hpatch_TStreamInput*)self->_old;
+            *pcoversListener=out_coversListener;
+            temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+hcache_old_mt_t_memSize(),kAlignSize);
+        }else{
+            hpatch_byte* oldCacheBuf=temp_cache; temp_cache+=windowOldBufSize;
+            self->_old=hcache_window_old_open(temp_cache,hcache_window_old_mt_t_memSize(),self->h_mt,
+                                              oldCacheBuf,windowOldBufSize,*poldData,windowCount);
+            if (self->_old==0) goto _on_error;
+            temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+hcache_window_old_mt_t_memSize(),kAlignSize);
+        }
+    }
     *ptemp_cache=temp_cache;
     return self;
 
 _on_error:
-    hpatch_mt_manager_close(self,hpatch_TRUE);
+    _mt_manager_base_close(self,hpatch_TRUE,isWindow);
     return 0;
 }
 
 #define _mt_obj_free(free_fn,mt_obj) { if (mt_obj) { isOnError|=!free_fn(mt_obj); mt_obj=0; } }
-hpatch_BOOL hpatch_mt_manager_close(struct hpatch_mt_manager_t* self,hpatch_BOOL isOnError){
+hpatch_BOOL _mt_manager_base_close(struct _mt_manager_base_t* self,hpatch_BOOL isOnError,hpatch_BOOL isWindow){
     if (!self) return !isOnError;
     if (self->h_mt) hpatch_mt_waitAllThreadEnd(self->h_mt,isOnError);
     _mt_obj_free(hinput_mt_close,     self->diffData);
     _mt_obj_free(hinput_mt_close,     self->decDiffData);
-    _mt_obj_free(hcache_old_mt_close, self->oldData);
     _mt_obj_free(houtput_mt_close,    self->newData);
+    if (!isWindow){
+        _mt_obj_free(hcache_old_mt_close,(hpatch_TStreamInput*)self->_old);
+    }else{
+        _mt_obj_free(hcache_window_old_close,(struct hcache_window_old_mt_t*)self->_old);
+    }
     if (self->h_mt) { isOnError|=!hpatch_mt_close(self->h_mt,isOnError); self->h_mt=0; }
     return !isOnError;
+}
+
+hpatch_mt_manager_t* hpatch_mt_manager_open(const hpatch_TStreamOutput** pout_newData,
+                                            const hpatch_TStreamInput**  poldData,
+                                            const hpatch_TStreamInput**  psingleCompressedDiff,
+                                            hpatch_StreamPos_t*          pdiffData_pos,
+                                            hpatch_StreamPos_t*          pdiffData_posEnd,
+                                            hpatch_StreamPos_t           uncompressedSize,
+                                            hpatch_TDecompress**         pdecompressPlugin,
+                                            size_t                       stepMemSize,
+                                            hpatch_byte** ptemp_cache,hpatch_byte** ptemp_cache_end,
+                                            sspatch_coversListener_t**   pcoversListener,
+                                            hpatch_BOOL                  isOnStepCoversInThread,
+                                            size_t                       kCacheCount,
+                                            hpatchMTSets_t               mtsets){
+    return (hpatch_mt_manager_t*)_mt_manager_base_open(pout_newData,poldData,psingleCompressedDiff,
+                                pdiffData_pos,pdiffData_posEnd,uncompressedSize,pdecompressPlugin,
+                                0,stepMemSize,0,ptemp_cache,ptemp_cache_end,pcoversListener,
+                                isOnStepCoversInThread,kCacheCount,mtsets,hpatch_FALSE);
+}
+
+hpatch_BOOL hpatch_mt_manager_close(struct hpatch_mt_manager_t* self,hpatch_BOOL isOnError){
+    return _mt_manager_base_close((struct _mt_manager_base_t*)self,isOnError,hpatch_FALSE);
+}
+
+
+typedef struct hpatch_mt_manager_win_t{
+    _mt_manager_base_t      base;
+} hpatch_mt_manager_win_t;
+
+//assert(sizeof(_mt_manager_base_t)==sizeof(hpatch_mt_manager_win_t));
+struct __private_hpatch_check_hpatch_mt_manager_win_t_size {
+    char _hw[(sizeof(_mt_manager_base_t)==sizeof(hpatch_mt_manager_win_t))?1:-1];};
+
+struct hpatch_mt_manager_win_t* hpatch_mt_manager_win_open(const hpatch_TStreamOutput** pout_newData,
+            const hpatch_TStreamInput**  poldData,const hpatch_TStreamInput**     pwindowDiffStream,
+            hpatch_StreamPos_t*          pdiffData_pos, hpatch_StreamPos_t*       pdiffData_posEnd,
+            hpatch_StreamPos_t           uncompressedSize, hpatch_TDecompress**   pdecompressPlugin,
+            hpatch_StreamPos_t windowCount,hpatch_size_t windowOldBufSize, hpatch_size_t stepMemSize,
+            unsigned char**              ptemp_cache, unsigned char**             ptemp_cache_end,
+            size_t                       kCacheCount, hpatchMTSets_t              mtsets){
+    return (struct hpatch_mt_manager_win_t*)_mt_manager_base_open(pout_newData,poldData,pwindowDiffStream,
+                                pdiffData_pos,pdiffData_posEnd,uncompressedSize,pdecompressPlugin,
+                                windowOldBufSize,stepMemSize,windowCount,ptemp_cache,ptemp_cache_end,0,
+                                hpatch_FALSE,kCacheCount,mtsets,hpatch_TRUE);
+}
+
+struct hcache_window_old_mt_t* hpatch_mt_manager_win_oldCache(struct hpatch_mt_manager_win_t* self){
+    if (!self) return 0;
+    assert(self->base._old!=0);
+    return (struct hcache_window_old_mt_t*)self->base._old;
+}
+
+hpatch_BOOL hpatch_mt_manager_win_close(struct hpatch_mt_manager_win_t* self,hpatch_BOOL isOnError){
+    return _mt_manager_base_close((struct _mt_manager_base_t*)self,isOnError,hpatch_TRUE);
 }
 
 

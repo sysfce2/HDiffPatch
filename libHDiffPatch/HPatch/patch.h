@@ -274,7 +274,8 @@ TWindowPatchResult patch_window_diff(struct winpatch_listener_t*  listener,
                                      const hpatch_TStreamOutput*  out_newData,         //sequential write
                                      const hpatch_TStreamInput*   oldData,             //random read
                                      const hpatch_TStreamInput*   windowDiff,          //sequential read
-                                     hpatch_StreamPos_t  diffInfo_pos //default 0, begin pos in windowDiff
+                                     hpatch_StreamPos_t  diffInfo_pos, //default 0, begin pos in windowDiff
+                                     size_t             threadNum   //1 for single-threaded, 2..5 for MT I/O
                                      );
 
 #ifdef __cplusplus

@@ -368,7 +368,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_StreamPos_t  oldDataSize;
         hpatch_StreamPos_t  coverCount;
         hpatch_StreamPos_t  windowCount;
-        hpatch_StreamPos_t  windowMetaCount;
+        hpatch_StreamPos_t  windowMetaCount;       //2^N, >=2 & <= hpatch_kMaxWindowMetaCount
         hpatch_StreamPos_t  maxStepMemSize;
         hpatch_StreamPos_t  maxSubCoverCount;
         hpatch_StreamPos_t  maxWindowOldSize;

@@ -48,7 +48,7 @@ typedef unsigned char   TByte;
 typedef ptrdiff_t       TInt;
 typedef size_t          TUInt;
 const long kRandTestCount=5000;
-const size_t patch_single_stream_threadNum=1; // 1..5;  1 single-thread, >1 multi-threads
+const size_t patch_threadNum=1; // 1..5;  1 single-thread, >1 multi-threads
 //#define _AttackPacth_ON
 
 //===== select compress plugin =====
@@ -565,7 +565,7 @@ long _attackPacth(TByte* out_newData,TByte* out_newData_end,
         case kDiffS: {
             sspatch_listener_t listener={0,_sspatch_onDiffInfo,0};
             patch_single_stream_mem(&listener,out_newData,out_newData_end,oldData,oldData_end,
-                                    diffData,diffData_end,0,patch_single_stream_threadNum);
+                                    diffData,diffData_end,0,patch_threadNum);
         } break;
         case kDiffi: case kDiffiI: {
             hpi_compressType    compressType;
@@ -585,7 +585,7 @@ long _attackPacth(TByte* out_newData,TByte* out_newData_end,
             mem_as_hStreamOutput(&out_newStream,out_newData,out_newData_end);
             mem_as_hStreamInput(&oldStream,oldData,oldData_end);
             mem_as_hStreamInput(&diffStream,diffData,diffData_end);
-            patch_window_diff(&listener,&out_newStream,&oldStream,&diffStream,0);
+            patch_window_diff(&listener,&out_newStream,&oldStream,&diffStream,0,patch_threadNum);
         } break;
     }
     return 0;
@@ -678,7 +678,7 @@ long test(const TByte* newData,const TByte* newData_end,
         if (out_diffSizes) out_diffSizes[kDiffSs]+=diffData.size();
         struct hpatch_TStreamInput in_diffStream;
         mem_as_hStreamInput(&in_diffStream,diffData.data(),diffData.data()+diffData.size());
-        if (!check_single_compressed_diff(&newStream,&oldStream,&in_diffStream,decompressPlugin,patch_single_stream_threadNum)){
+        if (!check_single_compressed_diff(&newStream,&oldStream,&in_diffStream,decompressPlugin,patch_threadNum)){
             printf("\n diffs stream error!!! tag:%s\n",tag);
             ++result;
         }else{

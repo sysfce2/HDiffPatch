@@ -1711,7 +1711,13 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
             hpatch_VcDiffInfo vcdiffInfo;
 #endif
             const char* compressType="";
-            if (getCompressedDiffInfo(&diffInfo,&diffData_in.base)){
+            if (getWindowDiffInfo(&winDiffInfo,&diffData_in.base,0)){
+                compressType=winDiffInfo.compressType;
+                checksumType=winDiffInfo.checksumType;
+                isWindowDiff=hpatch_TRUE;
+                if (!diffSets.isDoDiff)
+                    printf("test window diffData!\n");
+            }else if (getCompressedDiffInfo(&diffInfo,&diffData_in.base)){
                 if (!diffSets.isDoDiff)
                     printf("test compressed diffData!\n");
                 compressType=diffInfo.compressType;
@@ -1720,12 +1726,6 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
                 isSingleCompressedDiff=hpatch_TRUE;
                 if (!diffSets.isDoDiff)
                     printf("test single compressed diffData!\n");
-            }else if (getWindowDiffInfo(&winDiffInfo,&diffData_in.base,0)){
-                compressType=winDiffInfo.compressType;
-                checksumType=winDiffInfo.checksumType;
-                isWindowDiff=hpatch_TRUE;
-                if (!diffSets.isDoDiff)
-                    printf("test window diffData!\n");
 #if (_IS_NEED_BSDIFF)
             }else if (getIsBsDiff(&diffData_in.base,&isSingleCompressedBsDiff)){
                 *saved_decompressPlugin=_bz2DecompressPlugin_unsz;

@@ -273,7 +273,7 @@ void create_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamI
 enum TWindowPatchResult;
 enum TWindowPatchResult check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                           const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
-                                          hpatch_TChecksum* checksumPlugin);
+                                          hpatch_TChecksum* checksumPlugin,size_t threadNum=1);
 
 //resave window_diff
 hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
