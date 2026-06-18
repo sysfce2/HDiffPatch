@@ -29,9 +29,15 @@
 #include "_patch_private_mt.h"
 #if (_IS_USED_MULTITHREAD)
 
+typedef struct _hpatch_mt_condvar_item_t {
+    HCondvar              condvar;
+    HLocker               locker;
+    volatile hpatch_BOOL* isOnError;
+} _hpatch_mt_condvar_item_t;
+
 typedef struct hpatch_mt_t{
-    size_t                  threadNum;
-    HCondvar*               condvarList;
+    size_t                      threadNum;
+    _hpatch_mt_condvar_item_t*  condvarList;
     volatile hpatch_BOOL    isOnFinish;
     volatile hpatch_BOOL    isOnError;
     HLocker                 _locker;
@@ -45,8 +51,8 @@ hpatch_force_inline static
 hpatch_BOOL _hpatch_mt_init(hpatch_mt_t* self,size_t threadNum) {
     memset(self,0,sizeof(*self));
     self->threadNum=threadNum;
-    self->condvarList=(HCondvar*)(self+1);
-    memset(self->condvarList,0,threadNum*sizeof(HCondvar));
+    self->condvarList=(_hpatch_mt_condvar_item_t*)(self+1);
+    memset(self->condvarList,0,threadNum*sizeof(_hpatch_mt_condvar_item_t));
     self->_locker=c_locker_new();
     if (self->_locker==0) return hpatch_FALSE;
     if (!_hthreads_waiter_init(&self->threads_waiter))  return hpatch_FALSE;
@@ -60,24 +66,32 @@ static void _hpatch_mt_free(hpatch_mt_t* self) {
     {
         size_t i;
         for (i=0;i<self->threadNum;++i)
-            assert(self->condvarList[i]==0);
+            assert(self->condvarList[i].condvar==0);
     }
 #endif
 }
 
-static void _hpatch_mt_condvarList_broadcast(struct hpatch_mt_t* self){
+static void _hpatch_mt_condvarList_broadcast(struct hpatch_mt_t* self,hpatch_BOOL isOnError){
     size_t i;
     for (i=0;i<self->threadNum;++i){
-        if (self->condvarList[i])
-            c_condvar_broadcast(self->condvarList[i]);
+        if (self->condvarList[i].condvar){
+            c_locker_enter(self->condvarList[i].locker);
+            if (isOnError && self->condvarList[i].isOnError)
+                *self->condvarList[i].isOnError = hpatch_TRUE;
+            c_condvar_broadcast(self->condvarList[i].condvar);
+            c_locker_leave(self->condvarList[i].locker);
+        }
     }
 }
-hpatch_BOOL hpatch_mt_registeCondvar(struct hpatch_mt_t* self,HCondvar waitCondvar){
+hpatch_BOOL hpatch_mt_registeCondvar(struct hpatch_mt_t* self,HCondvar waitCondvar,
+                                     HLocker locker,volatile hpatch_BOOL* isOnErrorPtr){
     size_t i;
     assert(waitCondvar!=0);
     for (i=0;i<self->threadNum;++i){
-        if (self->condvarList[i]==0){
-            self->condvarList[i]=waitCondvar;
+        if (self->condvarList[i].condvar==0){
+            self->condvarList[i].condvar=waitCondvar;
+            self->condvarList[i].locker=locker;
+            self->condvarList[i].isOnError=isOnErrorPtr;
             return hpatch_TRUE;
         }
     }
@@ -88,8 +102,10 @@ hpatch_BOOL hpatch_mt_unregisteCondvar(struct hpatch_mt_t* self,HCondvar waitCon
     size_t i;
     assert(waitCondvar!=0);
     for (i=0;i<self->threadNum;++i){
-        if (self->condvarList[i]==waitCondvar){
-            self->condvarList[i]=0;
+        if (self->condvarList[i].condvar==waitCondvar){
+            self->condvarList[i].condvar=0;
+            self->condvarList[i].locker=0;
+            self->condvarList[i].isOnError=0;
             return hpatch_TRUE;
         }
     }
@@ -102,19 +118,19 @@ void __hpatch_mt_setOnError(hpatch_mt_t* self) {
     if (!self->isOnError){
         self->isOnFinish=hpatch_TRUE;
         self->isOnError=hpatch_TRUE;
-        _hpatch_mt_condvarList_broadcast(self);
+        _hpatch_mt_condvarList_broadcast(self,hpatch_TRUE);
     }
 }
 hpatch_inline static
 void __hpatch_mt_setOnFinish(hpatch_mt_t* self) {
     if (!self->isOnFinish){
         self->isOnFinish=hpatch_TRUE;
-        _hpatch_mt_condvarList_broadcast(self);
+        _hpatch_mt_condvarList_broadcast(self,hpatch_FALSE);
     }
 }
 
 size_t hpatch_mt_t_memSize(size_t maxThreadNum){
-    return sizeof(hpatch_mt_t)+maxThreadNum*sizeof(HCondvar);
+    return sizeof(hpatch_mt_t)+maxThreadNum*sizeof(_hpatch_mt_condvar_item_t);
 }
 hpatch_mt_t* hpatch_mt_open(void* pmem,size_t memSize,size_t maxThreadNum){
     hpatch_mt_t* self=(hpatch_mt_t*)pmem;
@@ -196,7 +212,7 @@ hpatch_BOOL _hpatch_mt_base_init(hpatch_mt_base_t* self,struct hpatch_mt_t* h_mt
     self->_locker=c_locker_new();
     self->_waitCondvar=c_condvar_new();
     if ((self->_waitCondvar!=0)&&(self->h_mt!=0)){
-        if (!hpatch_mt_registeCondvar(self->h_mt,self->_waitCondvar))
+        if (!hpatch_mt_registeCondvar(self->h_mt,self->_waitCondvar,self->_locker,&self->isOnError))
             return hpatch_FALSE;
     }
     return (self->_locker!=0)&&(self->_waitCondvar!=0);
