@@ -654,7 +654,7 @@ long test(const TByte* newData,const TByte* newData_end,
         create_single_compressed_diff(newData,newData_end,oldData,oldData_end,diffData,compressPlugin);
         if (out_diffSizes) out_diffSizes[kDiffS]+=diffData.size();
         if (!check_single_compressed_diff(newData,newData_end,oldData,oldData_end,
-                                          diffData.data(),diffData.data()+diffData.size(),decompressPlugin)){
+                                          diffData.data(),diffData.data()+diffData.size(),decompressPlugin,patch_threadNum)){
             printf("\n diffs error!!! tag:%s\n",tag);
             ++result;
         }else{
@@ -802,7 +802,7 @@ long test(const TByte* newData,const TByte* newData_end,
         struct hpatch_TStreamInput in_diffStream;
         mem_as_hStreamInput(&in_diffStream,diffData.data(),diffData.data()+diffData.size());
         if (kWindowPatch_ok!=check_window_diff(&newStream,&oldStream,&in_diffStream,
-                                                decompressPlugin,hdiffwDefaultChecksum)){
+                                                decompressPlugin,hdiffwDefaultChecksum,patch_threadNum)){
             printf("\n diffw error!!! tag:%s\n",tag);
             ++result;
         }else{

@@ -13,6 +13,7 @@ extern "C" {
 #if (_IS_USED_MULTITHREAD)
 
 struct hcache_window_old_mt_t;
+struct _oldwin_info_t;
 
 size_t hcache_window_old_mt_t_memSize(void);
 
@@ -21,10 +22,8 @@ struct hcache_window_old_mt_t* hcache_window_old_open(void* pmem,size_t memSize,
                                                       const hpatch_TStreamInput* old_stream,hpatch_StreamPos_t windowCount);
 
 // Main thread: batch submit window old data loading, appends to existing unconsumed batch;
-//   windowOldPos/windowOldLength: ring arrays of window metadata
 void hcache_window_old_prepareBatch(struct hcache_window_old_mt_t* self,hpatch_size_t batchCount,
-                                    const hpatch_StreamPos_t* windowOldPos,const hpatch_StreamPos_t* windowOldLength,
-                                    hpatch_size_t posStart,hpatch_size_t posMask);
+                                    const struct _oldwin_info_t* winInfos,hpatch_size_t posStart,hpatch_size_t posMask);
 
 // Main thread: get the data pointer for the next prepared window
 // Blocks until async load completes. Returns up to 2 segments (seg2 may be empty).

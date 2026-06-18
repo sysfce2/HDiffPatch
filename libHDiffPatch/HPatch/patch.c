@@ -2487,17 +2487,17 @@ hpatch_BOOL _patch_step_cache_old(const hpatch_TStreamInput** poldData,hpatch_St
 
 
 hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
-                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize){
-    const hpatch_size_t mt_needSize=windowOldBufSize*2+stepCoversMemSize+kMinTempCacheSize;
+                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize,hpatch_StreamPos_t oldDataSize){
+    hpatch_size_t result=(windowOldBufSize*2<oldDataSize)?windowOldBufSize*2:oldDataSize;
+    const hpatch_size_t mt_needSize=result+stepCoversMemSize+kMinTempCacheSize;
     hpatch_size_t cacheStepSize;
     if ((windowOldBufSize==0)||(tempCacheSize<mt_needSize))
         return 0;
     cacheStepSize=tempCacheSize-mt_needSize;
-    if (cacheStepSize<=kMinTempCacheSize){
-        return windowOldBufSize*2;
-    }else{
-        return windowOldBufSize*2+(cacheStepSize-kMinTempCacheSize)*1/2;
-    }
+    if (cacheStepSize<=kMinTempCacheSize)
+        return result;
+    result+=(cacheStepSize-kMinTempCacheSize)*1/2;
+    return (result<oldDataSize)?result:oldDataSize;
 }
 
 static hpatch_BOOL _patch_single_stream_loop(TStreamCacheClip* inClip,_TOutStreamCache* outCache,
@@ -2833,60 +2833,31 @@ static const size_t _kWindowCacheCount=_kCacheSgCount;
     static hpatch_BOOL _cache_load_window_old(const hpatch_TStreamInput* oldData,unsigned char* oldBuf,
                                               hpatch_StreamPos_t windowOldPos,hpatch_StreamPos_t windowOldLength,
                                               hpatch_StreamPos_t* pLastOldPos,hpatch_StreamPos_t* pLastOldEnd){
-        hpatch_StreamPos_t lastOldPos=*pLastOldPos;
-        hpatch_StreamPos_t lastOldEnd=*pLastOldEnd;
-        const hpatch_size_t windowOldEnd=windowOldPos+windowOldLength;
-
-        if ((windowOldPos>=lastOldPos)&&(windowOldEnd<=lastOldEnd)){
-            //    [lastOldPos              lastOldEnd]
-            //      [windowOldPos      windowOldEnd]
-            memmove(oldBuf,oldBuf+(hpatch_size_t)(windowOldPos-lastOldPos),(hpatch_size_t)windowOldLength);
-        }else if ((windowOldPos>=lastOldPos)&&(windowOldPos<lastOldEnd)){
-            //    [lastOldPos       lastOldEnd]
-            //      [windowOldPos      windowOldEnd]
-            hpatch_size_t reuseLen=(hpatch_size_t)(lastOldEnd-windowOldPos);
-            memmove(oldBuf,oldBuf+(hpatch_size_t)(windowOldPos-lastOldPos),reuseLen);
-            if (!oldData->read(oldData,lastOldEnd,oldBuf+reuseLen,oldBuf+(hpatch_size_t)windowOldLength))
-                return _hpatch_FALSE;
-        }else if ((windowOldEnd>lastOldPos)&&(windowOldEnd<=lastOldEnd)){
-            //           [lastOldPos        lastOldEnd]
-            //      [windowOldPos       windowOldEnd]
-            hpatch_size_t reuseLen=(hpatch_size_t)(windowOldEnd-lastOldPos);
-            hpatch_size_t dstOffset=(hpatch_size_t)(lastOldPos-windowOldPos);
-            memmove(oldBuf+dstOffset,oldBuf,reuseLen);
-            if (!oldData->read(oldData,windowOldPos,oldBuf,oldBuf+dstOffset))
-                return _hpatch_FALSE;
-        }else if (((windowOldPos<lastOldPos)&&(windowOldEnd>lastOldEnd))
-                &&((hpatch_size_t)(lastOldEnd-lastOldPos)>kMinSkipSpaceLen)){ // file seek cost 
-            //           [lastOldPos lastOldEnd]
-            //      [windowOldPos       windowOldEnd]
-            hpatch_size_t reuseLen=(hpatch_size_t)(lastOldEnd-lastOldPos);
-            hpatch_size_t dstOffset=(hpatch_size_t)(lastOldPos-windowOldPos);
-            memmove(oldBuf+dstOffset,oldBuf,reuseLen);
-            if (!oldData->read(oldData,windowOldPos,oldBuf,oldBuf+dstOffset))
-                return _hpatch_FALSE;
-            if (!oldData->read(oldData,lastOldEnd,oldBuf+dstOffset+reuseLen,oldBuf+(hpatch_size_t)windowOldLength))
-                return _hpatch_FALSE;
-        }else{//full read
-            if (!oldData->read(oldData,windowOldPos,oldBuf,oldBuf+(hpatch_size_t)windowOldLength))
-                return _hpatch_FALSE;
-        }
-
+        const hpatch_StreamPos_t lastOldPos=*pLastOldPos;
+        const hpatch_StreamPos_t lastOldEnd=*pLastOldEnd;
+        const hpatch_StreamPos_t windowOldEnd=windowOldPos+windowOldLength;
+        hpatch_StreamPos_t reuseLen,reuseOff,noOverlapLeft;
+        _compute_window_overlap(lastOldPos,lastOldEnd,windowOldPos,windowOldEnd,&reuseLen,&reuseOff,&noOverlapLeft);
+        memmove(oldBuf+(size_t)noOverlapLeft,oldBuf+(size_t)reuseOff,(size_t)reuseLen);
+        if ((noOverlapLeft>0)&&(!oldData->read(oldData,windowOldPos,oldBuf,oldBuf+(size_t)noOverlapLeft)))
+            return _hpatch_FALSE;
+        if ((noOverlapLeft+reuseLen<windowOldLength)&&(!oldData->read(oldData,windowOldPos+noOverlapLeft+reuseLen,
+                            oldBuf+(size_t)(noOverlapLeft+reuseLen),oldBuf+(size_t)windowOldLength)))
+            return _hpatch_FALSE;
         *pLastOldPos=windowOldPos;
         *pLastOldEnd=windowOldPos+windowOldLength;
         return hpatch_TRUE;
     }
 
     static hpatch_BOOL _read_meta_batch(TStreamCacheClip* clip,hpatch_StreamPos_t* pLastOldPos,
-                                        hpatch_StreamPos_t* metaOldPos,hpatch_StreamPos_t* metaOldLen,
-                                        hpatch_size_t writeIdx,hpatch_size_t batchSize){
+                                        _oldwin_info_t* winInfos,hpatch_size_t writeIdx,hpatch_size_t batchSize){
         hpatch_StreamPos_t lastOldPos=*pLastOldPos;
         hpatch_size_t i;
         for (i=0;i<batchSize;++i){
-            _clip_unpackUIntTo(&metaOldLen[writeIdx+i],clip);
+            _clip_unpackUIntTo(&winInfos[writeIdx+i].len,clip);
             if (!_read_sign_pos_byLastPos(clip,&lastOldPos)) return _hpatch_FALSE;
-            metaOldPos[writeIdx+i]=lastOldPos;
-            lastOldPos+=metaOldLen[writeIdx+i];
+            winInfos[writeIdx+i].oldPos=lastOldPos;
+            lastOldPos+=winInfos[writeIdx+i].len;
         }
         *pLastOldPos=lastOldPos;
         return hpatch_TRUE;
@@ -2921,8 +2892,7 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
     hpatch_StreamPos_t     lastOldEnd=0;
     hpatch_StreamPos_t     lastOldPosForMeta=0;  // running oldPos for delta decoding
     hpatch_StreamPos_t     loadedMetaEnd=0;
-    hpatch_StreamPos_t     metaOldPos[hpatch_kMaxWindowMetaCount];
-    hpatch_StreamPos_t     metaOldLen[hpatch_kMaxWindowMetaCount];
+    _oldwin_info_t         winInfos[hpatch_kMaxWindowMetaCount];
     hpatch_StreamPos_t     wi;
     hpatch_BOOL            result=hpatch_TRUE;
 
@@ -3018,11 +2988,11 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
             hpatch_size_t      writeIdx=(hpatch_size_t)(loadedMetaEnd & (metaCount-1));
             hpatch_StreamPos_t batchSize=windowCount-loadedMetaEnd;
             if (batchSize>savedMetaCount) batchSize=savedMetaCount;
-            if (!_read_meta_batch(&mainClip,&lastOldPosForMeta,metaOldPos,metaOldLen,writeIdx,(hpatch_size_t)batchSize))
+            if (!_read_meta_batch(&mainClip,&lastOldPosForMeta,winInfos,writeIdx,(hpatch_size_t)batchSize))
                 { result=_hpatch_FALSE; goto _clear; }
         #if (_HPATCH_IS_USED_MULTITHREAD)
             if (oldCache_mt)
-                hcache_window_old_prepareBatch(oldCache_mt,batchSize,metaOldPos,metaOldLen,writeIdx,metaCount-1);
+                hcache_window_old_prepareBatch(oldCache_mt,batchSize,winInfos,writeIdx,metaCount-1);
         #endif
             loadedMetaEnd+=batchSize;
         }
@@ -3031,8 +3001,8 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
         _clip_unpackUIntTo(&subCoverCount,&mainClip);
         {//look up oldPos/oldLength from ring buffer
             hpatch_size_t metaIdx=(hpatch_size_t)(wi & (metaCount-1));
-            windowOldPos   =metaOldPos[metaIdx];
-            windowOldLength=metaOldLen[metaIdx];
+            windowOldPos   =winInfos[metaIdx].oldPos;
+            windowOldLength=winInfos[metaIdx].len;
         }
 #if (defined __RUN_MEM_SAFE_CHECK)
         if (windowOldPos>oldData->streamSize) { result=_hpatch_FALSE; goto _clear; }
@@ -3084,13 +3054,15 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
         { result=_hpatch_FALSE; goto _clear; }
 
 _clear:
+    if (decompressPlugin)
+        close_compressed_stream_as_uncompressed(&uncompressedStream);
 #if (_HPATCH_IS_USED_MULTITHREAD)
     if (hpatch_mt_manager){
         if (!hpatch_mt_manager_win_close(hpatch_mt_manager,!result))
             result=_hpatch_FALSE;
+        hpatch_mt_manager=0;
     }
 #endif
-    close_compressed_stream_as_uncompressed(&uncompressedStream);
     return result;
 }
 

@@ -155,7 +155,7 @@ void create_inplace_lite_diff(const hpi_byte* newData,const hpi_byte* newData_en
     create_lite_diff(newData,newData_end,oldData,oldData_end,out_inplace_lite_diff,compressPlugin,
                      kMinSingleMatchScore,isUseBigCacheMatch,&matchInplace,threadNum);
 
-#ifdef _DEBUG
+#if (0)
     printf("\nDEBUG TMatchInplace info:\n"
            "    cur extraSafeSize    : %" PRIu64 "\n",matchInplace.curExtraSafeSize);
     printf("    extraSafe data length: %" PRIu64 "\n",matchInplace.inExtraSafeLength);
