@@ -45,6 +45,8 @@ static const size_t   kSafeHashClashBit_default= 24;
 //  out_hsyni will be loaded into memory when client sync_patch;
 //  out_hsyni's size becomes smaller when kSyncBlockSize increases,
 //    but the part of newData's size that need download becomes larger;
+//  strongChecksumPlugin: not recommended to use Adler-based checksum algorithms,
+//    because they've already been used for rolling checkums.
 void create_sync_data(const hpatch_TStreamInput*  newData,
                       const hpatch_TStreamOutput* out_hsyni,
                       hpatch_TChecksum*           strongChecksumPlugin,

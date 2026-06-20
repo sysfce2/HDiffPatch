@@ -67,7 +67,7 @@ static void _get_best_clips(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t
                             const TCover* cover,const TCover* cover_end,hpatch_StreamPos_t kSegSize){
     
     ranges.clear();
-    ranges.reserve(_x_size(cover,cover_end)/kSegSize+1);
+    ranges.reserve((size_t)(_x_size(cover,cover_end)/kSegSize)+1);
     ranges.push_back(TCoversRange(cover,cover_end));
     size_t i=0;
     std::vector<Tz> temp_zs;
@@ -87,7 +87,7 @@ static void _get_best_clips(std::vector<TCoversRange>& ranges,hpatch_StreamPos_t
 }
 
 static size_t _get_best_z(std::vector<Tz>& zs,const TCover* cover,const TCover* cover_end,
-                          const size_t R,hpatch_StreamPos_t kMaxNewPos){
+                          const hpatch_StreamPos_t R,hpatch_StreamPos_t kMaxNewPos){
     assert(cover<cover_end);
     zs.resize(cover_end-cover);
     for (size_t i=0;i<zs.size();i++){
@@ -104,7 +104,7 @@ static size_t _get_best_z(std::vector<Tz>& zs,const TCover* cover,const TCover* 
         zs[i].sum_w=cur_w;
     }
     
-    hpatch_StreamPos_t best_w_i=0;
+    size_t best_w_i=0;
     for (size_t i=1;i<zs.size();i++){
         if (zs[i].sum_w>zs[best_w_i].sum_w)
             best_w_i=i;
@@ -113,7 +113,7 @@ static size_t _get_best_z(std::vector<Tz>& zs,const TCover* cover,const TCover* 
 }
 
 static void _get_valid_by_z(unsigned char* out_valid,const TCover* cover,const TCover* cover_end,
-                            hpatch_StreamPos_t best_z,const size_t R,hpatch_StreamPos_t kMaxNewPos){
+                            hpatch_StreamPos_t best_z,const hpatch_StreamPos_t R,hpatch_StreamPos_t kMaxNewPos){
     for (;cover<cover_end;cover++,out_valid++){
         *out_valid =(_abs_sub(_z_off(cover,kMaxNewPos),best_z)<R)?1:0;
     }

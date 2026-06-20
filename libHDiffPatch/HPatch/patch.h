@@ -256,7 +256,6 @@ hpatch_BOOL getWindowDiffInfo(hpatch_windowDiffInfo*      out_diffInfo,
 typedef enum TWindowPatchResult{
     kWindowPatch_ok=0,
     kWindowPatch_load_head_error,
-    kWindowPatch_load_checksum_error,
     kWindowPatch_new_size_error,
     kWindowPatch_old_size_error,
     kWindowPatch_onDiffInfo_error,

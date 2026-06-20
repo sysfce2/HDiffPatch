@@ -486,7 +486,13 @@ void dir_diff(IDirDiffListener* listener,const TManifest& oldManifest,
     {
         const hdiff_TMTSets_s mtsets={hdiffSets.threadNum,hdiffSets.threadNumSearch_s,false,false};
         TOffsetStreamOutput ofStream(outDiffStream,writeToPos);
-        if (hdiffSets.isSingleCompressedDiff){
+        if (hdiffSets.isWindowDiff){
+            create_window_diff(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,0,
+                         hdiffSets.patchStepMemSize, hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                         hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                         (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                         hdiffSets.isUseBigCacheMatch,&mtsets);
+        }else if (hdiffSets.isSingleCompressedDiff){
             if (hdiffSets.isWindowDiffMode)
                 create_single_compressed_diff_window(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
                                                      hdiffSets.patchStepMemSize, hdiffSets.windowOldSize,hdiffSets.windowSegSize,
@@ -675,7 +681,7 @@ bool check_dirdiff(IDirDiffListener* listener,const TManifest& oldManifest,const
     CDirPatchListener    patchListener(newManifest.rootPath,oldList,newList);
     CDirPatcher          dirPatcher;
     const TDirDiffInfo*  dirDiffInfo=0;
-    TDirPatchChecksumSet    checksumSet={checksumPlugin,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE};
+    TPatchChecksumSet    checksumSet={checksumPlugin,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE};
 
     const hpatch_TStreamInput*  oldStream=0;
     const hpatch_TStreamOutput* newStream=0;
@@ -700,6 +706,8 @@ bool check_dirdiff(IDirDiffListener* listener,const TManifest& oldManifest,const
     size_t      temp_cache_size=hdiff_kFileIOBufBestSize*(1+16);
     if (dirDiffInfo->isSingleCompressedDiff)
         temp_cache_size+=(size_t)dirDiffInfo->sdiffInfo.stepMemSize;
+    if (dirDiffInfo->isWindowDiff)
+        temp_cache_size+=(size_t)(dirDiffInfo->winDiffInfo.maxWindowOldSize+dirDiffInfo->winDiffInfo.maxStepMemSize);
     TAutoMem    p_temp_mem(temp_cache_size);
     TByte*      temp_cache=p_temp_mem.data();
 

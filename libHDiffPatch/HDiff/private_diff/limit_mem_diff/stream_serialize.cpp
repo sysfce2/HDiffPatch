@@ -1042,7 +1042,7 @@ hpatch_BOOL TChecksumInputStream::_read(const hpatch_TStreamInput* stream,hpatch
     if (self->_isChecksuming){
         if (!self->_isRandomAccess){//sequential mode
             if (readEnd>self->_checkedPos){
-                size_t clen=readEnd-self->_checkedPos;
+                size_t clen=(size_t)(readEnd-self->_checkedPos);
                 self->_checksumPlugin->append(self->_checksumHandle,out_data_end-clen,out_data_end);
                 self->_checkedPos=readEnd;
             }
@@ -1229,7 +1229,7 @@ hpatch_BOOL TWindowDiffStream::_read(const hpatch_TStreamInput* stream,hpatch_St
     self->_readFromPos_back=readFromPos+(size_t)(out_data_end-out_data);
 
     if (readFromPos<self->_extraDataSize){//read extraData
-        size_t clen=self->_extraDataSize-readFromPos;
+        size_t clen=(size_t)(self->_extraDataSize-readFromPos);
         clen=std::min(clen,(size_t)(out_data_end-out_data));
         memcpy(out_data,self->_extraData+readFromPos,clen);
         out_data+=clen;

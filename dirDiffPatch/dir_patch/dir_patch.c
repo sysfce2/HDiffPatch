@@ -152,9 +152,27 @@ static hpatch_BOOL _read_dirdiff_head(TDirDiffInfo* out_info,_TDirDiffHead* out_
         if (isLoadHDiffInfo){
             TStreamInputClip_init(&hdiffStream,dirDiffFile,out_head->hdiffDataOffset,
                                   out_head->hdiffDataOffset+out_head->hdiffDataSize);
+#if (_IS_NEED_WINDOW_DIFF)
+            out_info->isWindowDiff=hpatch_FALSE;
+            memset(&out_info->winDiffInfo,0,sizeof(out_info->winDiffInfo));
+#endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
             out_info->isSingleCompressedDiff=hpatch_FALSE;
             out_info->sdiffInfo.stepMemSize=0;
+#endif
+#if (_IS_NEED_WINDOW_DIFF)
+            if (getWindowDiffInfo(&out_info->winDiffInfo,&hdiffStream.base,0)){
+                out_info->isWindowDiff=hpatch_TRUE;
+                out_info->hdiffInfo.newDataSize=out_info->winDiffInfo.newDataSize;
+                out_info->hdiffInfo.oldDataSize=out_info->winDiffInfo.oldDataSize;
+                out_info->hdiffInfo.compressedCount=(out_info->winDiffInfo.compressedSize>0)?1:0;
+                if (strlen(out_info->winDiffInfo.compressType)==0)
+                    memcpy(out_info->hdiffInfo.compressType,savedCompressType,savedCompressTypeLen+1);
+                else
+                    check(0==strcmp(savedCompressType,out_info->winDiffInfo.compressType));
+            }else
+#endif
+#if (_IS_NEED_SINGLE_STREAM_DIFF)
             if (getSingleCompressedDiffInfo(&out_info->sdiffInfo,&hdiffStream.base,0)){
                 out_info->isSingleCompressedDiff=hpatch_TRUE;
                 if (strlen(out_info->sdiffInfo.compressType)==0)
@@ -265,6 +283,7 @@ static hpatch_BOOL _do_checksum(TDirPatcher* self,const TByte* checksumTest,TByt
     size_t checksumByteSize=self->dirDiffInfo.checksumByteSize;
     hpatch_TChecksum*   checksumPlugin=self->_checksumSet.checksumPlugin;
     hpatch_checksumHandle  csHandle=checksumPlugin->open(checksumPlugin);
+    check(csHandle!=0);
     checksumPlugin->begin(csHandle);
     if (0<skipBegin){
         check(_checksum_append(checksumPlugin,csHandle,data,0,skipBegin,tempBuf,tempBufEnd));
@@ -279,11 +298,11 @@ clear:
     return result;
 }
 
-hpatch_BOOL TDirPatcher_checksum(TDirPatcher* self,const TDirPatchChecksumSet* checksumSet,
+hpatch_BOOL TDirPatcher_checksum(TDirPatcher* self,const TPatchChecksumSet* checksumSet,
 			                	 hpatch_byte* tempBuf,hpatch_byte* tempBufEnd){
     hpatch_BOOL result=hpatch_TRUE;
     hpatch_BOOL isHaveCheck=checksumSet->isCheck_oldRefData||checksumSet->isCheck_newRefData||
-                            checksumSet->isCheck_copyFileData||checksumSet->isCheck_dirDiffData;
+                            checksumSet->isCheck_copyFileData||checksumSet->isCheck_diffData;
     if (checksumSet->checksumPlugin){
         check(0==strcmp(self->dirDiffInfo.checksumType,checksumSet->checksumPlugin->checksumType()));
         check(self->dirDiffInfo.checksumByteSize==checksumSet->checksumPlugin->checksumByteSize());
@@ -302,7 +321,7 @@ hpatch_BOOL TDirPatcher_checksum(TDirPatcher* self,const TDirPatchChecksumSet* c
                                        "self->_dirDiffData->read");
         
         //checksum dirDiffData
-        if (self->_checksumSet.isCheck_dirDiffData){
+        if (self->_checksumSet.isCheck_diffData){
             hpatch_StreamPos_t savedDiffChecksumOffset=checksumOffset+checksumByteSize*3;
             if(!_do_checksum(self,_pchecksumDiffData(self),_pchecksumTemp(self),self->_dirDiffData,
                              savedDiffChecksumOffset,savedDiffChecksumOffset+checksumByteSize,tempBuf,tempBufEnd))
@@ -546,6 +565,31 @@ void _do_checksumOldRef(TDirPatcher* self,const hpatch_TStreamInput* oldData,hpa
     }
 }
 
+#if (_IS_NEED_WINDOW_DIFF)
+typedef struct _dirWinPatchListener_t {
+    hpatch_TDecompress* decompressPlugin;
+    TByte*              temp_cache;
+    TByte*              temp_cache_end;
+} _dirWinPatchListener_t;
+
+static hpatch_BOOL _dirWin_onDiffInfo(struct winpatch_listener_t* listener,const hpatch_windowDiffInfo* info,
+                                      hpatch_TDecompress** out_decompressPlugin,struct hpatch_TChecksum** out_checksumPlugin,
+                                      hpatch_BOOL* isCheckSumNew,hpatch_BOOL* isCheckSumOld,hpatch_BOOL* isCheckSumDiff,
+                                      unsigned char** out_temp_cache,unsigned char** out_temp_cacheEnd){
+    _dirWinPatchListener_t* ctx=(_dirWinPatchListener_t*)listener->import;
+    *out_decompressPlugin=ctx->decompressPlugin;
+    *out_checksumPlugin=0;
+    *isCheckSumNew=hpatch_FALSE;
+    *isCheckSumOld=hpatch_FALSE;
+    *isCheckSumDiff=hpatch_FALSE;
+    assert((size_t)(ctx->temp_cache_end-ctx->temp_cache)>=info->maxWindowOldSize+info->maxStepMemSize+hpatch_kStreamCacheSize*3);
+    *out_temp_cache=ctx->temp_cache;
+    *out_temp_cacheEnd=ctx->temp_cache_end;
+    return hpatch_TRUE;
+}
+
+#endif
+
 hpatch_BOOL TDirPatcher_patch(TDirPatcher* self,const hpatch_TStreamOutput* out_newData,
                               const hpatch_TStreamInput* oldData,
                               TByte* temp_cache,TByte* temp_cache_end,size_t threadNum){
@@ -557,6 +601,11 @@ hpatch_BOOL TDirPatcher_patch(TDirPatcher* self,const hpatch_TStreamOutput* out_
     if (self->dirDiffInfo.isSingleCompressedDiff)
         patchCacheSize_min+=(size_t)self->dirDiffInfo.sdiffInfo.stepMemSize;
 #endif
+#if (_IS_NEED_WINDOW_DIFF)
+    if (self->dirDiffInfo.isWindowDiff)
+        patchCacheSize_min+=(size_t)(self->dirDiffInfo.winDiffInfo.maxWindowOldSize+self->dirDiffInfo.winDiffInfo.maxStepMemSize);
+#endif
+    check(patchCacheSize_min<=(size_t)(temp_cache_end-temp_cache));
     if (self->_checksumSet.isCheck_oldRefData){
         if ((size_t)(temp_cache_end-temp_cache)>=oldData->streamSize+patchCacheSize_min){
             //load all oldData into memory for optimize speed of checksum oldData
@@ -573,6 +622,20 @@ hpatch_BOOL TDirPatcher_patch(TDirPatcher* self,const hpatch_TStreamOutput* out_
     }
     TStreamInputClip_init(&hdiffData,self->_dirDiffData,self->dirDiffHead.hdiffDataOffset,
                           self->dirDiffHead.hdiffDataOffset+self->dirDiffHead.hdiffDataSize);
+#if (_IS_NEED_WINDOW_DIFF)
+    if (self->dirDiffInfo.isWindowDiff){
+        _dirWinPatchListener_t      winCtx;
+        struct winpatch_listener_t  winListener;
+        TWindowPatchResult          wResult;
+        winCtx.decompressPlugin=self->_decompressPlugin;
+        winCtx.temp_cache=temp_cache;
+        winCtx.temp_cache_end=temp_cache_end;
+        winListener.import=&winCtx;
+        winListener.onDiffInfo=_dirWin_onDiffInfo;
+        wResult=patch_window_diff(&winListener,out_newData,oldData,&hdiffData.base,0,threadNum);
+        checki(wResult==kWindowPatch_ok,"TDirPatcher_patch() patch_window_diff");
+    }else
+#endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
     if (self->dirDiffInfo.isSingleCompressedDiff){
         hpatch_singleCompressedDiffInfo* sdiffInfo=&self->dirDiffInfo.sdiffInfo;
@@ -767,7 +830,7 @@ static hpatch_BOOL _do_checksumFiles(TDirPatcher* self,size_t fileCount,_t_getPa
     
     hpatch_TFileStreamInput_init(&fileData);
     check(tempBuf);
-    if (checksumPlugin) checksumPlugin->begin(csHandle);
+    if (checksumPlugin){ check(csHandle!=0); checksumPlugin->begin(csHandle); }
     for (i=0;i<fileCount;++i) {
         {
             char _tmpPath[hpatch_kPathMaxSize];
@@ -800,7 +863,7 @@ hpatch_BOOL TDirOldDataChecksum_checksum(TDirOldDataChecksum* self,hpatch_TDecom
     checki(tempBuf,"malloc()");
     check(self->_isOpened&&self->_isAppendStoped);
     if (checksumPlugin){
-        TDirPatchChecksumSet checksumSet;
+        TPatchChecksumSet checksumSet;
         memset(&checksumSet,0,sizeof(checksumSet));
         checksumSet.checksumPlugin=checksumPlugin;
         checksumSet.isCheck_oldRefData=hpatch_TRUE;

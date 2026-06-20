@@ -70,7 +70,7 @@ typedef enum TSyncClient_resultType{
     kSyncClient_strongChecksumByteSizeError=40,
     kSyncClient_strongChecksumOpenError,
     kSyncClient_checksumSyncDataError,
-    kSyncClient_newDataCheckChecksumError,  // NOTE: safeBit not enough? You should re-download the original unabridged newData!
+    kSyncClient_newDataChecksumConflictError,  // NOTE: safeBit not enough? You should re-download the original unabridged newData!
     kSyncClient_noDecompressPluginError,
     kSyncClient_decompressOpenError,        // 45
     kSyncClient_decompressError,

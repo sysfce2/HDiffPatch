@@ -17,13 +17,13 @@ extern "C" {
     #endif
 
     // return THPatchResult, 0 is ok
-    //  threadNum: 1..5
-    //    multi-thread (threadNum>1) patching now only support single compressed diffData(created by hdiffz -SD);
+    //  threadNum: 1..5, multi-thread (threadNum>1) patching 
+    //    now support single compressed diffData(created by hdiffz -SD) & window diffData(created by hdiffz -WD, recommended)
     //  cacheMemory:
     //    cacheMemory is used for file IO, different cacheMemory only affects patch speed;
-    //    recommended 256*1024,1024*1024,... if cacheMemory<0 then default 256*1024;
-    int hpatchz(const char *oldFileName,const char *diffFileName,
-                const char *outNewFileName,int64_t cacheMemory,size_t threadNum) H_PATCH_EXPORT;
+    //    recommended 1M,8M,... if cacheMemory<0 then default 1024*1024*1;
+    int hpatchz(const char *oldFileName,const char *diffFileName,const char *outNewFileName,
+                int64_t cacheMemory,size_t threadNum,hpatch_BOOL isChecksumNewData) H_PATCH_EXPORT;
 
 #ifdef __cplusplus
 }

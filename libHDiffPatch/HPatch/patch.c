@@ -2488,7 +2488,7 @@ hpatch_BOOL _patch_step_cache_old(const hpatch_TStreamInput** poldData,hpatch_St
 
 hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
                                                          hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize,hpatch_StreamPos_t oldDataSize){
-    hpatch_size_t result=(windowOldBufSize*2<oldDataSize)?windowOldBufSize*2:oldDataSize;
+    hpatch_size_t result=(windowOldBufSize*2<oldDataSize)?windowOldBufSize*2:(hpatch_size_t)oldDataSize;
     const hpatch_size_t mt_needSize=result+stepCoversMemSize+kMinTempCacheSize;
     hpatch_size_t cacheStepSize;
     if ((windowOldBufSize==0)||(tempCacheSize<mt_needSize))
@@ -2497,7 +2497,7 @@ hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOld
     if (cacheStepSize<=kMinTempCacheSize)
         return result;
     result+=(cacheStepSize-kMinTempCacheSize)*1/2;
-    return (result<oldDataSize)?result:oldDataSize;
+    return (result<oldDataSize)?result:(hpatch_size_t)oldDataSize;
 }
 
 static hpatch_BOOL _patch_single_stream_loop(TStreamCacheClip* inClip,_TOutStreamCache* outCache,
@@ -3010,7 +3010,7 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
                 { result=_hpatch_FALSE; goto _clear; }
         #if (_HPATCH_IS_USED_MULTITHREAD)
             if (oldCache_mt)
-                hcache_window_old_prepareBatch(oldCache_mt,batchSize,winInfos,writeIdx,metaCount-1);
+                hcache_window_old_prepareBatch(oldCache_mt,(hpatch_size_t)batchSize,winInfos,writeIdx,(hpatch_size_t)metaCount-1);
         #endif
             loadedMetaEnd+=batchSize;
         }
@@ -3162,9 +3162,9 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
     unsigned char*           temp_cache_back=0;
     unsigned char*           temp_cache=0;
     unsigned char*           temp_cacheEnd=0;
-    hpatch_BOOL              isCheckSumNew=hpatch_TRUE;
-    hpatch_BOOL              isCheckSumOld=hpatch_FALSE;
-    hpatch_BOOL              isCheckSumDiff=hpatch_FALSE;
+    hpatch_BOOL              isChecksumNew=hpatch_TRUE;
+    hpatch_BOOL              isChecksumOld=hpatch_FALSE;
+    hpatch_BOOL              isChecksumDiff=hpatch_FALSE;
     hpatch_checksumHandle    checksumHandle_old=0;
     hpatch_checksumHandle    checksumHandle_new=0;
     hpatch_checksumHandle    checksumHandle_diff=0;
@@ -3193,7 +3193,7 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
     out_newData->streamSize=diffInfo.newDataSize;//adjust output stream size
 
     if (!listener->onDiffInfo(listener,&diffInfo,&decompressPlugin,&checksumPlugin,
-                              &isCheckSumNew,&isCheckSumOld,&isCheckSumDiff,&temp_cache,&temp_cacheEnd))
+                              &isChecksumNew,&isChecksumOld,&isChecksumDiff,&temp_cache,&temp_cacheEnd))
         return kWindowPatch_onDiffInfo_error;
     if ((temp_cache==0)||(temp_cache>=temp_cacheEnd))
         return kWindowPatch_temp_mem_error;
@@ -3201,39 +3201,39 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
         return kWindowPatch_temp_mem_error;
     temp_cache_back=temp_cache;
 
-    if ((diffInfo.checksumByteSize>0)&&(isCheckSumNew||isCheckSumOld||isCheckSumDiff)){
+    if ((diffInfo.checksumByteSize>0)&&(isChecksumNew||isChecksumOld||isChecksumDiff)){
         if ((!checksumPlugin)||(diffInfo.checksumByteSize!=checksumPlugin->checksumByteSize()))
             return kWindowPatch_checksum_plugin_error;
         checksumByteSize=(size_t)diffInfo.checksumByteSize;
     }else{
         checksumByteSize=0;         checksumPlugin=0;
-        isCheckSumNew=hpatch_FALSE; isCheckSumOld=hpatch_FALSE; isCheckSumDiff=hpatch_FALSE;
+        isChecksumNew=hpatch_FALSE; isChecksumOld=hpatch_FALSE; isChecksumDiff=hpatch_FALSE;
     }
 
-    if (isCheckSumOld){
+    if (isChecksumOld){
         checksumHandle_old=checksumPlugin->open(checksumPlugin);
         if (!checksumHandle_old) { result=kWindowPatch_checksum_open_error; goto clear; }
         checksumPlugin->begin(checksumHandle_old);
     }
-    if (isCheckSumNew){
+    if (isChecksumNew){
         checksumHandle_new=checksumPlugin->open(checksumPlugin);
         if (!checksumHandle_new) { result=kWindowPatch_checksum_open_error; goto clear; }
         checksumPlugin->begin(checksumHandle_new);
     }
-    if (isCheckSumDiff){
+    if (isChecksumDiff){
         checksumHandle_diff=checksumPlugin->open(checksumPlugin);
         if (!checksumHandle_diff) { result=kWindowPatch_checksum_open_error; goto clear; }
         checksumPlugin->begin(checksumHandle_diff);
     }
     
-    if (isCheckSumDiff){//wrap diff stream input for checksum
+    if (isChecksumDiff){//wrap diff stream input for checksum
         _TChecksumInputStream_init(&checksumDiffInput,windowDiff,checksumPlugin,checksumHandle_diff);
         effectiveDiffStream=&checksumDiffInput.base;
     }else{
         effectiveDiffStream=windowDiff;
     }
 
-    if (isCheckSumNew){//wrap new stream output for checksum
+    if (isChecksumNew){//wrap new stream output for checksum
         _TChecksumOutputStream_init(&checksumNewOutput,out_newData,checksumPlugin,checksumHandle_new);
         effectiveOutNew=&checksumNewOutput.base;
     }else{
@@ -3249,17 +3249,17 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
         hpatch_byte* storedChecksumNew=storedChecksumOld+checksumByteSize;
         hpatch_byte* storedChecksumDiff=storedChecksumNew+checksumByteSize;
         hpatch_byte* computedChecksum=temp_cache; temp_cache+=checksumByteSize; assert(temp_cache<temp_cacheEnd);
-        hpatch_BOOL  isCheckSumNew_and_eq=hpatch_FALSE;
-        if (isCheckSumNew){//verify new data checksum
+        hpatch_BOOL  isChecksumNew_and_eq=hpatch_FALSE;
+        if (isChecksumNew){//verify new data checksum
             checksumPlugin->end(checksumHandle_new,computedChecksum,computedChecksum+checksumByteSize);
-            isCheckSumNew_and_eq=(0==memcmp(computedChecksum,storedChecksumNew,checksumByteSize));
-			if (isCheckSumNew_and_eq){
+            isChecksumNew_and_eq=(0==memcmp(computedChecksum,storedChecksumNew,checksumByteSize));
+			if (isChecksumNew_and_eq){
                 //assert(patch_result); //why fail?
                 patch_result=hpatch_TRUE;//note: if patch failed, but new data checksum is correct, we can consider it as success.
             }
         }
-        if (!isCheckSumNew_and_eq){
-            if (isCheckSumDiff){//verify diff checksum
+        if (!isChecksumNew_and_eq){
+            if (isChecksumDiff){//verify diff checksum
                  //read to diffData end for checksum
                 if (!_readForSkipStream(&checksumDiffInput.base,checksumDiffInput.readedEndPos,
                                         checksumDiffInput.base.streamSize,temp_cache,temp_cacheEnd))
@@ -3271,13 +3271,13 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
             }
             if ((!patch_result)&&(diffInfo.oldDataSize!=oldData->streamSize))
                 { result=kWindowPatch_old_size_error; goto clear; }
-            if ((patch_result||(isCheckSumNew&&(checksumNewOutput.writedEndPos==diffInfo.newDataSize)))//all old's data checked
-                 &&isCheckSumOld){//verify old data checksum
+            if ((patch_result||(isChecksumNew&&(checksumNewOutput.writedEndPos==diffInfo.newDataSize)))//all old's data checked
+                 &&isChecksumOld){//verify old data checksum
                 checksumPlugin->end(checksumHandle_old,computedChecksum,computedChecksum+checksumByteSize);
                 if (0!=memcmp(computedChecksum,storedChecksumOld,checksumByteSize))
                     { result=kWindowPatch_checksum_old_error; goto clear; }
             }
-            if (isCheckSumNew) { result=kWindowPatch_checksum_new_error; goto clear; }
+            if (isChecksumNew) { result=kWindowPatch_checksum_new_error; goto clear; }
         }
     }
     if (!patch_result) { result=kWindowPatch_patch_error; goto clear; }

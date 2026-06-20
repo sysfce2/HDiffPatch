@@ -131,7 +131,7 @@ static void _hcache_window_old_mt_thread(int threadIndex, void* workData) {
     hcache_window_old_mt_t* self = (hcache_window_old_mt_t*)workData;
     hpatch_StreamPos_t lastOldPos=0;
     hpatch_StreamPos_t lastOldEnd=0;
-    hpatch_StreamPos_t lastBufPos=0;
+    size_t lastBufPos=0;
     while (!hpatch_mt_isOnFinish(self->mt_base.h_mt)){
         size_t localUnprocessedCount=0;
         size_t localUnprocessedWinStart;
@@ -149,7 +149,7 @@ static void _hcache_window_old_mt_thread(int threadIndex, void* workData) {
             size_t winIdx;
             for (winIdx=0;winIdx<localUnprocessedCount;++winIdx) {
                 const _oldwin_info_t* winInfo=&self->winInfos[(localUnprocessedWinStart + winIdx) & _kWinMask];
-                size_t winLen = winInfo->len;
+                size_t winLen = (size_t)winInfo->len;
                 hpatch_StreamPos_t winPos = winInfo->oldPos;
                 size_t winBufPos = lastBufPos;
                 hpatch_BOOL isReadOk=hpatch_TRUE;
@@ -158,11 +158,11 @@ static void _hcache_window_old_mt_thread(int threadIndex, void* workData) {
                 // Wait until this window's write doesn't overlap with protected region
                 c_locker_enter(self->mt_base._locker);
                 while ((!self->mt_base.isOnError)
-                      &&_buf_ranges_overlap(winBufPos,winLen-reuseLen,self->protectedBufPos,self->protectedLen,self->bufSize)) {
+                      &&_buf_ranges_overlap(winBufPos,winLen-(size_t)reuseLen,self->protectedBufPos,self->protectedLen,self->bufSize)) {
                     c_condvar_wait(self->mt_base._waitCondvar, self->mt_base._locker);
                 }
                 // Mark this window's data as protected (it will be written next)
-                self->protectedLen += winLen-reuseLen;
+                self->protectedLen += winLen-(size_t)reuseLen;
                 c_locker_leave(self->mt_base._locker);
                 if (self->mt_base.isOnError) break;
                 
@@ -175,7 +175,7 @@ static void _hcache_window_old_mt_thread(int threadIndex, void* workData) {
                     { hpatch_mt_base_setOnError_(&self->mt_base); break; }
                 lastOldPos=winPos;
                 lastOldEnd=winPos+winLen;
-                lastBufPos=__ring_pos(lastBufPos+winLen-reuseLen,self->bufSize);
+                lastBufPos=__ring_pos(lastBufPos+winLen-(size_t)reuseLen,self->bufSize);
 
                 // Signal this window's completion
                 c_locker_enter(self->mt_base._locker);
@@ -255,10 +255,11 @@ hpatch_BOOL hcache_window_old_getWindow(hcache_window_old_mt_t* self,
         if (self->mt_base.isOnError) return hpatch_FALSE;
     }
     
-    _ring_memswap(self->buf,self->bufSize,self->protectedBufPos,self->_reuseLen_back,self->_noOverlapLeft_back);
+    _ring_memswap(self->buf,self->bufSize,self->protectedBufPos,
+                  (size_t)self->_reuseLen_back,(size_t)self->_noOverlapLeft_back);
 
     {// Return pointers into the ring buffer
-        size_t       oldLen = wi->len;
+        size_t       oldLen = (size_t)wi->len;
         size_t       bufPos = self->protectedBufPos;
         *out_seg1_begin = self->buf + bufPos;
         if (!_buf_range_wraps(bufPos,oldLen,self->bufSize)) {
@@ -278,7 +279,7 @@ void hcache_window_old_finishWindow(hcache_window_old_mt_t* self){
     c_locker_enter(self->mt_base._locker);
     {
         const _oldwin_info_t* lastWinInfo= &self->winInfos[self->winStart];
-        size_t lastWinLen = lastWinInfo->len;
+        size_t lastWinLen = (size_t)lastWinInfo->len;
         hpatch_StreamPos_t reuseLen=0;
         hpatch_StreamPos_t noOverlapLeft=0;
         self->winStart = (self->winStart + 1) & _kWinMask;
@@ -293,13 +294,14 @@ void hcache_window_old_finishWindow(hcache_window_old_mt_t* self){
                                     winInfo->oldPos,winInfo->oldPos+winInfo->len,&reuseLen,&reuseOff,&noOverlapLeft);
             if (reuseLen>0){
                 hpatch_StreamPos_t protectedBufPos_next=self->protectedBufPos+(lastWinLen-reuseLen);
-                _ring_memmove_to_right(self->buf,self->bufSize,self->protectedBufPos+reuseOff,protectedBufPos_next,reuseLen);
+                _ring_memmove_to_right(self->buf,self->bufSize,self->protectedBufPos+(size_t)reuseOff,
+                                       (size_t)protectedBufPos_next,(size_t)reuseLen);
             }
         }
-        self->protectedLen -= (lastWinLen-reuseLen);
-        self->protectedBufPos=__ring_pos(self->protectedBufPos+lastWinLen-reuseLen,self->bufSize);
-        self->_reuseLen_back=reuseLen;
-        self->_noOverlapLeft_back=noOverlapLeft;
+        self->protectedLen -= (lastWinLen-(size_t)reuseLen);
+        self->protectedBufPos=__ring_pos(self->protectedBufPos+lastWinLen-(size_t)reuseLen,self->bufSize);
+        self->_reuseLen_back=(size_t)reuseLen;
+        self->_noOverlapLeft_back=(size_t)noOverlapLeft;
     }
     c_condvar_signal(self->mt_base._waitCondvar); // wake async thread waiting on protected region
     c_locker_leave(self->mt_base._locker);

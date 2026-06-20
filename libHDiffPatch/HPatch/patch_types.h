@@ -390,8 +390,8 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
                                   const hpatch_windowDiffInfo* info,
                                   hpatch_TDecompress** out_decompressPlugin,//find decompressPlugin by info->compressType
                                   struct hpatch_TChecksum** out_checksumPlugin, //find checksumPlugin by info->checksumType
-                                  hpatch_BOOL* isCheckSumNew,   // *isCheckSumNew default true when have info->checksumType
-                                  hpatch_BOOL* isCheckSumOld,hpatch_BOOL* isCheckSumDiff, 
+                                  hpatch_BOOL* isChecksumNew,   // *isChecksumNew default true when have info->checksumType
+                                  hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff, 
                                   unsigned char** out_temp_cache,    //*out_temp_cacheEnd-*out_temp_cache == info->maxWindowOldSize + info->stepMemSize + (I/O cache memory)
                                   unsigned char** out_temp_cacheEnd);//  note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
         void        (*onPatchFinish)(struct winpatch_listener_t* listener, //onPatchFinish can null

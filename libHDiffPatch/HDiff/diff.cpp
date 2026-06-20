@@ -1143,15 +1143,15 @@ static hpatch_BOOL _check_window_onDiffInfo(struct winpatch_listener_t* listener
                                             const hpatch_windowDiffInfo* info,
                                             hpatch_TDecompress** out_decompressPlugin,
                                             hpatch_TChecksum** out_checksumPlugin,
-                                            hpatch_BOOL* isCheckSumNew,hpatch_BOOL* isCheckSumOld,hpatch_BOOL* isCheckSumDiff,
+                                            hpatch_BOOL* isChecksumNew,hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff,
                                             unsigned char** out_temp_cache,
                                             unsigned char** out_temp_cacheEnd){
     TWindowCheckImport* import=(TWindowCheckImport*)listener->import;
     *out_decompressPlugin=(info->compressType[0]=='\0')?0:import->decompressPlugin;
     *out_checksumPlugin=(info->checksumByteSize>0)?import->checksumPlugin:0;
-    *isCheckSumNew=(*out_checksumPlugin!=0);
-    *isCheckSumOld=(*out_checksumPlugin!=0);
-    *isCheckSumDiff=(*out_checksumPlugin!=0);
+    *isChecksumNew=(*out_checksumPlugin!=0);
+    *isChecksumOld=(*out_checksumPlugin!=0);
+    *isChecksumDiff=(*out_checksumPlugin!=0);
     size_t memSize=(size_t)(info->maxWindowOldSize+info->maxStepMemSize)+hdiff_kFileIOBufBestSize*16;
     *out_temp_cache=(unsigned char*)malloc(memSize);
     *out_temp_cacheEnd=(*out_temp_cache)+memSize;
@@ -2178,8 +2178,8 @@ void get_match_covers_in_a_window(const hpatch_TStreamInput* newData,const hpatc
     }
 
     TAutoMem mem;
-    loadOldAndNewStream(mem,oldData,window.oldPos,window.oldLength,
-                        newData,window.newPos,window.newLength);
+    loadOldAndNewStream(mem,oldData,window.oldPos,(size_t)window.oldLength,
+                        newData,window.newPos,(size_t)window.newLength);
     unsigned char* pOldData=mem.data();
     unsigned char* pNewData=pOldData+window.oldLength;
     if (!bigCovers.empty()) {
@@ -2329,7 +2329,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
             outDiff.stream_update(checksumNew_ph,tempChecksumBuf.data());
         }
         {//checksumDiff: finalize +checksum head
-            std::vector<hpatch_byte> tempBuf(checksumDiff_ph.pos);
+            std::vector<hpatch_byte> tempBuf((size_t)checksumDiff_ph.pos);
             checki(out_diff->read_writed!=0,"serialize_window_diff() out_diff can't read error!");
             check(out_diff->read_writed(out_diff,0,tempBuf.data(),tempBuf.data()+tempBuf.size()));
             checksumPlugin->append(checksumDiffHandle,tempBuf.data(),tempBuf.data()+tempBuf.size());//checksum head
@@ -2365,7 +2365,7 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
     }
     const char* compressType=compressPlugin?compressPlugin->compressType():"";
 
-    const hpatch_size_t checksumByteSize=diffInfo->checksumByteSize;
+    const hpatch_size_t checksumByteSize=(hpatch_size_t)diffInfo->checksumByteSize;
     if (checksumByteSize>0){//check
         checki((checksumPlugin!=0)&&(checksumPlugin->checksumByteSize()==checksumByteSize)
              &&(0==strcmp(checksumPlugin->checksumType(),diffInfo->checksumType)),
@@ -2406,6 +2406,7 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
     outDiff.packUInt(diffInfo->oldDataSize);
     outDiff.packUInt(diffInfo->coverCount);
     outDiff.packUInt(diffInfo->windowCount);
+    outDiff.packUInt(diffInfo->windowMetaCount);
     outDiff.packUInt(diffInfo->maxStepMemSize);
     outDiff.packUInt(diffInfo->maxSubCoverCount);
     outDiff.packUInt(diffInfo->maxWindowOldSize);
@@ -2443,7 +2444,7 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
         outDiff.packUInt_update(compressedSize_ph,wrtitedWindowDataSize);
 
     if (checksumByteSize>0){//checksumDiff: finalize +checksum head
-        std::vector<hpatch_byte> tempBuf(checksumDiff_ph.pos);
+        std::vector<hpatch_byte> tempBuf((size_t)checksumDiff_ph.pos);
         checki(out_diff->read_writed!=0,"resave_window_diff() out_diff can't read error!");
         check(out_diff->read_writed(out_diff,0,tempBuf.data(),tempBuf.data()+tempBuf.size()));
         checksumPlugin->append(checksumDiffHandle,tempBuf.data(),tempBuf.data()+tempBuf.size());//checksum head

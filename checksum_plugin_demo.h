@@ -164,7 +164,7 @@ static void _adler32_append(hpatch_checksumHandle handle,
     }
     *pv=(hpatch_uint32_t)v;
 #else
-    *pv=_adler32_append(*pv,part_data,(size_t)(part_data_end-part_data));
+    *pv=adler32_append(*pv,part_data,(size_t)(part_data_end-part_data));
 #endif
 }
 static void _adler32_end(hpatch_checksumHandle handle,
