@@ -15,7 +15,7 @@ public class HPatch{
     //  if need VCDIFF ($hdiffz -VCD or xdelta3 or open-vcdiff ) format support, build .so with VCD=1 can opened;
     //  if need bsdiff4 & endsley/bsdiff format support, build .so with BSD=1 BZIP2=1 can opened;
     //  if need supported oldFileName or outNewFileName is directory, build .so with DIR=1 can opened;
-    //  threadNum: 1..5, default not used; build .so with MT=1 can opened multi-thread patching;
+    //  threadNum: 1..5, default 1; >1 opened multi-thread patching;
     //      now support single compressed diffData(created by hdiffz -SD) & window diffData(created by hdiffz -WD, recommended)
     //  isChecksumNewData: default true; checsum newData when patching VCDIFF and window diffData;
     public static native int patch(String oldFileName,String diffFileName,String outNewFileName,long cacheMemory,int _threadNum,boolean isChecksumNewData);
@@ -26,6 +26,6 @@ public class HPatch{
         return patch(oldFileName,diffFileName,outNewFileName,cacheMemory,1,true);
     }
     public static final int patch(String oldFileName,String diffFileName,String outNewFileName){
-        return patch(oldFileName,diffFileName,outNewFileName,1024*1024*1,1,true);
+        return patch(oldFileName,diffFileName,outNewFileName,1024*1024*4,1,true);
     }
 }

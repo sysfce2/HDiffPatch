@@ -19,6 +19,7 @@
 		0D8721112E7B856C008E97DB /* md5.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D8721102E7B856C008E97DB /* md5.c */; };
 		0D99CCB32FD6CDD1005CC92A /* window_matcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCB12FD6C873005CC92A /* window_matcher.cpp */; };
 		0D99CCB42FD6CDD1005CC92A /* covers_range.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCB22FD6C873005CC92A /* covers_range.cpp */; };
+		0D99CCC62FE9004E005CC92A /* _hcache_window_old_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCC32FE8FD7C005CC92A /* _hcache_window_old_mt.c */; };
 		0DA2A8EE292B9880000E86E1 /* vcdiff_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0DA2A8E9292B9880000E86E1 /* vcdiff_wrapper.cpp */; };
 		0DA2A8EF292B9880000E86E1 /* vcpatch_wrapper.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA2A8EB292B9880000E86E1 /* vcpatch_wrapper.c */; };
 		0DA6865F2E536C50002A6651 /* _hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686542E536A3C002A6651 /* _hpatch_mt.c */; };
@@ -85,6 +86,8 @@
 		0D99CCB02FD6C873005CC92A /* window_matcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = window_matcher.h; sourceTree = "<group>"; };
 		0D99CCB12FD6C873005CC92A /* window_matcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = window_matcher.cpp; sourceTree = "<group>"; };
 		0D99CCB22FD6C873005CC92A /* covers_range.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = covers_range.cpp; sourceTree = "<group>"; };
+		0D99CCC22FE8FD7C005CC92A /* _hcache_window_old_mt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = _hcache_window_old_mt.h; sourceTree = "<group>"; };
+		0D99CCC32FE8FD7C005CC92A /* _hcache_window_old_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = _hcache_window_old_mt.c; sourceTree = "<group>"; };
 		0DA2A8E9292B9880000E86E1 /* vcdiff_wrapper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = vcdiff_wrapper.cpp; sourceTree = "<group>"; };
 		0DA2A8EA292B9880000E86E1 /* vcpatch_code_table.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vcpatch_code_table.h; sourceTree = "<group>"; };
 		0DA2A8EB292B9880000E86E1 /* vcpatch_wrapper.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vcpatch_wrapper.c; sourceTree = "<group>"; };
@@ -240,6 +243,8 @@
 		0DA686532E536A3C002A6651 /* hpatch_mt */ = {
 			isa = PBXGroup;
 			children = (
+				0D99CCC32FE8FD7C005CC92A /* _hcache_window_old_mt.c */,
+				0D99CCC22FE8FD7C005CC92A /* _hcache_window_old_mt.h */,
 				0DA686542E536A3C002A6651 /* _hpatch_mt.c */,
 				0DA686552E536A3C002A6651 /* _hinput_mt.h */,
 				0DA686562E536A3C002A6651 /* hpatch_mt.c */,
@@ -502,6 +507,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0D99CCC62FE9004E005CC92A /* _hcache_window_old_mt.c in Sources */,
 				0D99CCB32FD6CDD1005CC92A /* window_matcher.cpp in Sources */,
 				0D99CCB42FD6CDD1005CC92A /* covers_range.cpp in Sources */,
 				0DA6865F2E536C50002A6651 /* _hpatch_mt.c in Sources */,

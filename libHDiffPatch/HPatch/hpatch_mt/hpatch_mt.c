@@ -164,8 +164,8 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
           #endif // _IS_NEED_CACHE_OLD_BY_COVERS
         }else{
             kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
-            if (!_patch_is_can_cache_window_old_canUsedSize(windowOldBufSize,stepMemSize,kMinTempCacheSize,
-                                                            temp_cacheSumSize,oldSize)>0){
+            if (_patch_is_can_cache_window_old_canUsedSize(windowOldBufSize,stepMemSize,kMinTempCacheSize,
+                                                           temp_cacheSumSize,oldSize)>0){
                 mtsets.readOld_isMT=0; // not use MT.
             }
         }
@@ -385,9 +385,9 @@ hpatch_BOOL _mt_manager_base_close(struct _mt_manager_base_t* self,hpatch_BOOL i
     _mt_obj_free(hinput_mt_close,     self->decDiffData);
     _mt_obj_free(houtput_mt_close,    self->newData);
     if (!isWindow){
-        _mt_obj_free(hcache_old_mt_close,(hpatch_TStreamInput*)self->_old);
+        _mt_obj_free(hcache_old_mt_close,*(hpatch_TStreamInput**)&self->_old);
     }else{
-        _mt_obj_free(hcache_window_old_close,(struct hcache_window_old_mt_t*)self->_old);
+        _mt_obj_free(hcache_window_old_close,*(struct hcache_window_old_mt_t**)&self->_old);
     }
     if (self->h_mt) { isOnError|=!hpatch_mt_close(self->h_mt,isOnError); self->h_mt=0; }
     return !isOnError;

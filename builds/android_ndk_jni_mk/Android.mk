@@ -5,7 +5,7 @@ LOCAL_MODULE := hpatchz
 
 # args
 # is use multi-thread patch? (threads for I/O & decompress)
-MT    := 0
+MT    := 1
 ZLIB  := 1
 LZMA  := 1
 ZSTD  := 1
@@ -16,13 +16,9 @@ BSD   := 0
 BZIP2 := 0
 # is need directory patch?
 DIR   := 0
-ifeq ($(DIR),0)
-  MD5 := 0
-  XXH := 0
-else
-  MD5 := 1
-  XXH := 1
-endif
+# select checksum for WinDiff & DirDiff; default opened fadler64 & crc32(when ZLIB=1)
+MD5   := 1
+XXH   := 1
 
 DEF_FLAGS := -Os -flto -DANDROID_NDK -DNDEBUG -D_LARGEFILE_SOURCE -D_IS_NEED_DEFAULT_CompressPlugin=0 \
              -D_IS_NEED_CACHE_OLD_BY_COVERS=0 -D_IS_NEED_CACHE_OLD_ALL=1
@@ -39,6 +35,7 @@ ifeq ($(MT),0)
 else  
   DEF_FLAGS += -D_IS_USED_MULTITHREAD=1
   Src_Files += $(HDP_PATH)/libHDiffPatch/HPatch/hpatch_mt/_hcache_old_mt.c \
+               $(HDP_PATH)/libHDiffPatch/HPatch/hpatch_mt/_hcache_window_old_mt.c \
                $(HDP_PATH)/libHDiffPatch/HPatch/hpatch_mt/_hinput_mt.c \
                $(HDP_PATH)/libHDiffPatch/HPatch/hpatch_mt/_houtput_mt.c \
                $(HDP_PATH)/libHDiffPatch/HPatch/hpatch_mt/_hpatch_mt.c \
@@ -49,30 +46,33 @@ endif
 ifeq ($(DIR),0)
   DEF_FLAGS += -D_IS_NEED_DIR_DIFF_PATCH=0
 else
-  DEF_FLAGS += -D_IS_NEED_DIR_DIFF_PATCH=1 -D_IS_NEED_DEFAULT_ChecksumPlugin=0 -D_ChecksumPlugin_fadler64
-  Src_Files += $(HDP_PATH)/libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.c \
-               $(HDP_PATH)/dirDiffPatch/dir_patch/dir_patch.c \
+  DEF_FLAGS += -D_IS_NEED_DIR_DIFF_PATCH=1
+  Src_Files += $(HDP_PATH)/dirDiffPatch/dir_patch/dir_patch.c \
                $(HDP_PATH)/dirDiffPatch/dir_patch/dir_patch_tools.c \
                $(HDP_PATH)/dirDiffPatch/dir_patch/new_dir_output.c \
                $(HDP_PATH)/dirDiffPatch/dir_patch/new_stream.c \
                $(HDP_PATH)/dirDiffPatch/dir_patch/ref_stream.c \
                $(HDP_PATH)/dirDiffPatch/dir_patch/res_handle_limit.c
 
-  ifeq ($(ZLIB),0)
-  else
-    DEF_FLAGS += -D_ChecksumPlugin_crc32
-  endif
-  ifeq ($(MD5),0)
-  else
-    MD5_PATH := $(HDP_PATH)/../libmd5
-    DEF_FLAGS += -D_ChecksumPlugin_md5 -I$(MD5_PATH)
-    Src_Files += $(MD5_PATH)/md5.c
-  endif
-  ifeq ($(XXH),0)
-  else
-    XXH_PATH := $(HDP_PATH)/../xxHash
-    DEF_FLAGS += -D_ChecksumPlugin_xxh3 -D_ChecksumPlugin_xxh128 -I$(XXH_PATH)
-  endif
+endif
+
+DEF_FLAGS += -D_IS_NEED_DEFAULT_ChecksumPlugin=0 -D_ChecksumPlugin_fadler64
+  Src_Files += $(HDP_PATH)/libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.c
+
+ifeq ($(ZLIB),0)
+else
+  DEF_FLAGS += -D_ChecksumPlugin_crc32
+endif
+ifeq ($(MD5),0)
+else
+  MD5_PATH := $(HDP_PATH)/../libmd5
+  DEF_FLAGS += -D_ChecksumPlugin_md5 -I$(MD5_PATH)
+  Src_Files += $(MD5_PATH)/md5.c
+endif
+ifeq ($(XXH),0)
+else
+  XXH_PATH := $(HDP_PATH)/../xxHash
+  DEF_FLAGS += -D_ChecksumPlugin_xxh3 -D_ChecksumPlugin_xxh128 -I$(XXH_PATH)
 endif
 
 ifeq ($(BSD),0)
@@ -87,9 +87,6 @@ ifeq ($(VCD),0)
 else
   DEF_FLAGS += -D_IS_NEED_VCDIFF=1
   Src_Files += $(HDP_PATH)/vcdiff_wrapper/vcpatch_wrapper.c
-  ifeq ($(DIR),0)
-    Src_Files +=$(HDP_PATH)/libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.c
-  endif
 endif
 
 ifeq ($(ZLIB),0)

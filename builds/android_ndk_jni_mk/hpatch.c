@@ -27,8 +27,10 @@ void bz_internal_error(int errcode){
 #endif
 
     static inline size_t limitCacheMemory(int64_t cacheMemory){
-        #define _kPatchCacheSize_min  (1024*1024*1)
+        #define _kPatchCacheSize_min  (1024*256)
+        #define _kPatchCacheSize_def  (1024*1024*4)
         #define _kPatchCacheSize_max  (((size_t)1)<<((sizeof(size_t)>4)?32:30))
+        if (cacheMemory<0) return _kPatchCacheSize_def;
         if (cacheMemory<=_kPatchCacheSize_min) return _kPatchCacheSize_min;
         return (size_t)(((hpatch_uint64_t)cacheMemory<_kPatchCacheSize_max)?cacheMemory:_kPatchCacheSize_max);
     }

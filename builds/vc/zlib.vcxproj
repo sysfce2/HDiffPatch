@@ -214,11 +214,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\..\..\zlib\adler32.c" />
     <ClCompile Include="..\..\..\zlib\crc32.c" />
     <ClCompile Include="..\..\..\zlib\deflate.c" />

@@ -20,6 +20,7 @@
 		0D99CC8F2E9A611E005CC92A /* match_block.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CC8E2E9A611E005CC92A /* match_block.cpp */; };
 		0D99CCBC2FD6CF0E005CC92A /* window_matcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCB92FD6CF0E005CC92A /* window_matcher.cpp */; };
 		0D99CCBD2FD6CF0E005CC92A /* covers_range.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCBA2FD6CF0E005CC92A /* covers_range.cpp */; };
+		0D99CCC42FE9004E005CC92A /* _hcache_window_old_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D99CCBF2FE8FD4D005CC92A /* _hcache_window_old_mt.c */; };
 		0DA686642E536CB4002A6651 /* _hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686352E536964002A6651 /* _hpatch_mt.c */; };
 		0DA686652E536CB4002A6651 /* hpatch_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686372E536964002A6651 /* hpatch_mt.c */; };
 		0DA686662E536CB4002A6651 /* _houtput_mt.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA686382E536964002A6651 /* _houtput_mt.c */; };
@@ -89,6 +90,8 @@
 		0D99CCB82FD6CF0E005CC92A /* window_matcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = window_matcher.h; sourceTree = "<group>"; };
 		0D99CCB92FD6CF0E005CC92A /* window_matcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = window_matcher.cpp; sourceTree = "<group>"; };
 		0D99CCBA2FD6CF0E005CC92A /* covers_range.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = covers_range.cpp; sourceTree = "<group>"; };
+		0D99CCBE2FE8FD3E005CC92A /* _hcache_window_old_mt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = _hcache_window_old_mt.h; sourceTree = "<group>"; };
+		0D99CCBF2FE8FD4D005CC92A /* _hcache_window_old_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = _hcache_window_old_mt.c; sourceTree = "<group>"; };
 		0DA686352E536964002A6651 /* _hpatch_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = _hpatch_mt.c; sourceTree = "<group>"; };
 		0DA686362E536964002A6651 /* _hinput_mt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = _hinput_mt.h; sourceTree = "<group>"; };
 		0DA686372E536964002A6651 /* hpatch_mt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = hpatch_mt.c; sourceTree = "<group>"; };
@@ -234,6 +237,8 @@
 		0DA686342E536964002A6651 /* hpatch_mt */ = {
 			isa = PBXGroup;
 			children = (
+				0D99CCBF2FE8FD4D005CC92A /* _hcache_window_old_mt.c */,
+				0D99CCBE2FE8FD3E005CC92A /* _hcache_window_old_mt.h */,
 				0DA686352E536964002A6651 /* _hpatch_mt.c */,
 				0DA686362E536964002A6651 /* _hinput_mt.h */,
 				0DA686372E536964002A6651 /* hpatch_mt.c */,
@@ -426,6 +431,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0D99CCC42FE9004E005CC92A /* _hcache_window_old_mt.c in Sources */,
 				0D99CCBD2FD6CF0E005CC92A /* covers_range.cpp in Sources */,
 				0DA686642E536CB4002A6651 /* _hpatch_mt.c in Sources */,
 				0DA686652E536CB4002A6651 /* hpatch_mt.c in Sources */,

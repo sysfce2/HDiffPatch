@@ -21,9 +21,9 @@ extern "C" {
     //    now support single compressed diffData(created by hdiffz -SD) & window diffData(created by hdiffz -WD, recommended)
     //  cacheMemory:
     //    cacheMemory is used for file IO, different cacheMemory only affects patch speed;
-    //    recommended 1M,8M,... if cacheMemory<0 then default 1024*1024*1;
+    //    recommended 1M,8M,... if cacheMemory<0 then default 1024*1024*4;
     int hpatchz(const char *oldFileName,const char *diffFileName,const char *outNewFileName,
-                int64_t cacheMemory,size_t threadNum,hpatch_BOOL isChecksumNewData) H_PATCH_EXPORT;
+                int64_t cacheMemory,size_t threadNum,unsigned int isChecksumNewData) H_PATCH_EXPORT;
 
 #ifdef __cplusplus
 }

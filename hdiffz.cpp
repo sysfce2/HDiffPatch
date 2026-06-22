@@ -1769,7 +1769,7 @@ static int hdiff_by_stream(const char* oldFileName,const char* newFileName,const
         else
 #endif
         if (isWindowDiff){
-            TWindowPatchResult wp_rt=check_window_diff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin,saved_checksumPlugin);
+            TWindowPatchResult wp_rt=(TWindowPatchResult)check_window_diff(&newData.base,&oldData.base,&diffData_in.base,saved_decompressPlugin,saved_checksumPlugin);
             diffrt=(wp_rt==kWindowPatch_ok);
             if (wp_rt!=kWindowPatch_ok)
                 printf("  patch_window_diff() return error code: TWindowPatchResult %d\n",(int)wp_rt);

@@ -232,14 +232,14 @@ hpatch_BOOL _patch_cache_all_old(const hpatch_TStreamInput** poldData,size_t kMi
 #if (_IS_NEED_CACHE_OLD_BY_COVERS)
 
 hpatch_size_t _patch_step_cache_old_canUsedSize(hpatch_size_t stepCoversMemSize,hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize);
-hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
-                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize,hpatch_StreamPos_t oldDataSize);
 
 // try cache part of oldData, used by patch_single_stream_diff()
 hpatch_BOOL _patch_step_cache_old(const hpatch_TStreamInput** poldData,hpatch_StreamPos_t newDataSize,size_t stepCoversMemSize,
                                   size_t kMinTempCacheSize,hpatch_byte** ptemp_cache,hpatch_byte** ptemp_cache_end);
 hpatch_BOOL _patch_step_cache_old_onStepCovers(const hpatch_TStreamInput* self,const unsigned char* covers_cache,const unsigned char* covers_cacheEnd);
 #endif // _IS_NEED_CACHE_OLD_BY_COVERS
+hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
+                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize,hpatch_StreamPos_t oldDataSize);
 
 // ---- window overlap computation (shared by ST and MT) ----
 

@@ -75,10 +75,11 @@ const size_t patch_threadNum=1; // 1..5;  1 single-thread, >1 multi-threads
 #include "../../hsynz/dict_decompress_plugin_demo.h" // https://github.com/sisong/hsynz
 #endif
 
-#define _ChecksumPlugin_crc32
+//#define _ChecksumPlugin_crc32
 #define _ChecksumPlugin_fadler64
 #include "../checksum_plugin_demo.h"
-static hpatch_TChecksum* hsynzStrongChecksum=&crc32ChecksumPlugin; // not strong enough for hsynz, just for testing.  
+//static hpatch_TChecksum* hsynzStrongChecksum=&crc32ChecksumPlugin; //not strong enough for hsynz, just for testing.  
+static hpatch_TChecksum* hsynzStrongChecksum=&fadler64ChecksumPlugin; //can't be used for hsynz, just for testing.  
 static hpatch_TChecksum* hWinDiffChecksum=&fadler64ChecksumPlugin;
 
 #ifdef  _CompressPlugin_no

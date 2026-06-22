@@ -15,7 +15,17 @@
            withDiff:(NSString *)diffFileName
               toNew:(NSString *)outNewFileName
 {
-    return [hpatcher patchWithOld:oldFileName withDiff:diffFileName toNew:outNewFileName byMemory:256*1024 byThreadNum:1];
+    return [hpatcher patchWithOld:oldFileName withDiff:diffFileName 
+            toNew:outNewFileName byMemory:1024*1024*4 byThreadNum:1 byChecksum:1];
+}
+
++ (int)patchWithOld:(NSString *)oldFileName
+           withDiff:(NSString *)diffFileName
+              toNew:(NSString *)outNewFileName
+           byMemory:(int64_t)cacheMemory
+{
+    return [hpatcher patchWithOld:oldFileName withDiff:diffFileName 
+            toNew:outNewFileName byMemory:cacheMemory byThreadNum:1 byChecksum:1];
 }
 
 + (int)patchWithOld:(NSString *)oldFileName
@@ -24,10 +34,22 @@
            byMemory:(int64_t)cacheMemory
         byThreadNum:(size_t)threadNum
 {
+    return [hpatcher patchWithOld:oldFileName withDiff:diffFileName 
+            toNew:outNewFileName byMemory:cacheMemory byThreadNum:threadNum byChecksum:1];
+}
+
++ (int)patchWithOld:(NSString *)oldFileName
+           withDiff:(NSString *)diffFileName
+              toNew:(NSString *)outNewFileName
+           byMemory:(int64_t)cacheMemory
+        byThreadNum:(size_t)threadNum
+         byChecksum:(BOOL)isChecksumNewData
+{
     #define HPATCH_OPTIONS_ERROR 1
     const char* old_cstr=(oldFileName==NULL)?0:[oldFileName UTF8String];
     if ((diffFileName==NULL)||(outNewFileName==NULL)) return HPATCH_OPTIONS_ERROR;
-    return hpatchz(old_cstr,[diffFileName UTF8String],[outNewFileName UTF8String],cacheMemory,threadNum);
+    return hpatchz(old_cstr,[diffFileName UTF8String],[outNewFileName UTF8String],
+                   cacheMemory,threadNum,isChecksumNewData);
 }
 
 @end

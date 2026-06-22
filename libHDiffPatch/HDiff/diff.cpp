@@ -1163,9 +1163,9 @@ static void _check_window_onPatchFinish(struct winpatch_listener_t* listener,
     if (temp_cache) free(temp_cache);
 }
 
-enum TWindowPatchResult check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                                          const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
-                                          hpatch_TChecksum* checksumPlugin,size_t threadNum){
+int check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                      const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
+                      hpatch_TChecksum* checksumPlugin,size_t threadNum){
     TWindowCheckImport import;
     import.decompressPlugin=decompressPlugin;
     import.checksumPlugin=checksumPlugin;
@@ -2300,7 +2300,7 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
         hpatch_StreamPos_t headRemainingSize=outDiff.getWritedPos()-headSize_ph.pos_end;
         check(headRemainingSize+strlen(kHDiffWindowVersionType)+2<=hpatch_kWindowDiffHeadMaxSize);
         check(headRemainingSize<(1<<16));
-        hpatch_byte _le16[2]={headRemainingSize&0xFF,(headRemainingSize>>8)&0xFF};
+        hpatch_byte _le16[2]={(hpatch_byte)headRemainingSize,(hpatch_byte)(headRemainingSize>>8)};
         outDiff.stream_update(headSize_ph,_le16);
     }
     if (checksumByteSize>0){
@@ -2364,7 +2364,6 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
         checki((decompressPlugin!=0)&&(decompressPlugin->is_can_open(diffInfo->compressType)),
                "resave_window_diff() decompressPlugin error!");
     }
-    const char* compressType=compressPlugin?compressPlugin->compressType():"";
 
     const hpatch_size_t checksumByteSize=(hpatch_size_t)diffInfo->checksumByteSize;
     if (checksumByteSize>0){//check
@@ -2417,7 +2416,7 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
         hpatch_StreamPos_t headRemainingSize=outDiff.getWritedPos()-headSize_ph.pos_end;
         check(headRemainingSize+strlen(kHDiffWindowVersionType)+2<=hpatch_kWindowDiffHeadMaxSize);
         check(headRemainingSize<(1<<16));
-        hpatch_byte _le16[2]={headRemainingSize&0xFF,(headRemainingSize>>8)&0xFF};
+        hpatch_byte _le16[2]={(hpatch_byte)headRemainingSize,(hpatch_byte)(headRemainingSize>>8)};
         outDiff.stream_update(headSize_ph,_le16);
     }
     if (checksumByteSize>0)

@@ -70,6 +70,7 @@ HPATCH_OBJ := \
 ifeq ($(MT),0)
 else
   HPATCH_OBJ+=libHDiffPatch/HPatch/hpatch_mt/_hcache_old_mt.o \
+              libHDiffPatch/HPatch/hpatch_mt/_hcache_window_old_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_hinput_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_houtput_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_hpatch_mt.o \
