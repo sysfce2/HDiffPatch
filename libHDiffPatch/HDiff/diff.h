@@ -100,6 +100,7 @@ static const size_t kDefaultFastMatchBlockSize = 1024*1;
 static const size_t kMatchWindowsBlockSize_default = (1<<6);
 static const size_t kDefaultBigCoverSize = 1024*16;
 static const size_t kDefaultWindowOldSize = 1024*512;
+static const size_t kDefaultSegRatioInWindowOldSize = 64; // default segSize=windowOldSize/kDefaultSegRatioInWindowOldSize
 
 //create a compressed diff data by window mode:
 //  optimize the access speed of old data when patch
@@ -174,7 +175,7 @@ void create_single_compressed_diff_stream(const hpatch_TStreamInput*  newData,
 //create single compressed diff data by window mode:
 //  optimize the access speed of old data when patch
 //  kOldWindowSize: max window bytes on old data;
-//  kSegSize: initial data granularity during window matching, DEFAULT kOldWindowSize/16;
+//  kSegSize: initial data granularity during window matching, DEFAULT kOldWindowSize/64;
 //  throw std::runtime_error when I/O error or kSegSize too large,etc.
 void create_single_compressed_diff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                           const hpatch_TStreamOutput* out_diff,

@@ -186,16 +186,16 @@ static void printUsage(){
            "      set is use a big cache for slow match, DEFAULT false;\n"
            "      if newData not similar to oldData then diff speed++,\n"
            "      big cache max used O(oldFileSize) memory, and build slow(diff speed--)\n" 
-           "  -w[-oldSize-segSize]\n"
-           "      diff by window mode; optimize the access of old data when patch;\n"
-           "        in -m mode, outDiffFile size+, while in -s mode, outDiffFile size--\n"
-           "        if oldSize++ or segSize--, outDiffFile size-, but diff & patch speed--\n"
-           "      oldSize: max window bytes on old data, DEFAULT -w-512k;\n"
-           "        for big file, recommended -w-4m-1m, -w-16m, etc...\n"
-           "      segSize: initial data granularity during window matching,\n"
-           "        segSize < oldSize, DEFAULT oldSize/16;\n"
-           "  -WD[-stepSize]\n"
-           "      create window diffData(HDIFFW26), optimize the access of old data when patch;\n"
+           "  -w[-oldWinSize-segSize]\n"
+           "      diff by window mode; optimize read old data when patch;\n"
+           "        in -m mode, outDiffFile size+, in -s mode, outDiffFile size-- & patch speed-;\n"
+           "        if oldWinSize+ or segSize-, outDiffFile size-, but diff & patch speed--\n"
+           "      oldWinSize: max window bytes on old data, DEFAULT -w-2m;\n"
+           "        for big file, recommended -w-4m-128k, -w-16m-256k, etc...\n"
+           "      segSize: initial data granularity during window matching, DEFAULT oldWinSize/64;\n"
+           "        recommended oldWinSize/128<=segSize<=oldWinSize/4;\n"
+           "  -WD[-stepSize]                (need v5.0 patcher)\n"
+           "      create window diffData(HDIFFW26), optimize read old data when patch;\n"
            "      recommended as the primary diff format; when patch, and support step by step\n"
            "        patching when step by step downloading! and supports multi-thread patching!\n"
            "      requires diff by window mode, auto enable -w if not set;\n"
@@ -238,7 +238,7 @@ static void printUsage(){
            "      out format same as $open-vcdiff ... or $xdelta3 -S -e -n ...\n"
 #   endif
            "      NOTE: default out diffFile used large source window size! \n"
-           "        need used -w[-oldSize-segSize-newSize] to set source/segment/target window size.\n"
+           "        need used -w[-oldWinSize-segSize-newSize] to set source/segment/target window size.\n"
 #endif
 #if (_IS_USED_MULTITHREAD)
            "  -p-parallelThreadNumber\n"
@@ -1155,7 +1155,7 @@ int hdiff_cmd_line(int argc, const char * argv[]){
                 if (op[2]=='-'){
                     const char* pold=op+3;
                     const char* poldEnd=findUntilEnd(pold,'-');
-                    _options_check(kmg_to_size(pold,(size_t)(poldEnd-pold),&diffSets.windowOldSize),"-w-oldSize?");
+                    _options_check(kmg_to_size(pold,(size_t)(poldEnd-pold),&diffSets.windowOldSize),"-w-oldWinSize?");
                     if (poldEnd[0]=='-'){
                         const char* pseg=poldEnd+1;
                         const char* psegEnd=findUntilEnd(pseg,'-');
@@ -1245,8 +1245,8 @@ int hdiff_cmd_line(int argc, const char * argv[]){
     if (diffSets.isWindowDiffMode==_kNULL_VALUE)
         diffSets.isWindowDiffMode=hpatch_FALSE;
     if (diffSets.isWindowDiffMode){
-        static const size_t kMinWindowSize=1024*64;
-        static const size_t kMinWindowSegSize=1024*4;
+        static const size_t kMinWindowSize=1024*32;
+        static const size_t kMinWindowSegSize=kMinWindowSize/kDefaultSegRatioInWindowOldSize;
         
         if (diffSets.windowOldSize==_kNULL_SIZE)
             diffSets.windowOldSize=kDefaultWindowOldSize;
@@ -1872,10 +1872,7 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
 #endif
     if (getWindowDiffInfo(&winDiffInfo,&diffData_in.base,0)){
         isWindowDiff=hpatch_TRUE;
-        diffInfo.newDataSize=winDiffInfo.newDataSize;
-        diffInfo.oldDataSize=winDiffInfo.oldDataSize;
-        diffInfo.compressedCount=(winDiffInfo.compressedSize>0)?1:0;
-        memcpy(diffInfo.compressType,winDiffInfo.compressType,hpatch_kMaxPluginTypeLength+1);
+        _winDiffInfoToHDiffInfo(&diffInfo,&winDiffInfo);
         printf("  resave as window diffFile \n");
     }else if (getSingleCompressedDiffInfo(&singleDiffInfo,&diffData_in.base,0)){
         isSingleDiff=hpatch_TRUE;

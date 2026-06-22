@@ -163,13 +163,11 @@ static hpatch_BOOL _read_dirdiff_head(TDirDiffInfo* out_info,_TDirDiffHead* out_
 #if (_IS_NEED_WINDOW_DIFF)
             if (getWindowDiffInfo(&out_info->winDiffInfo,&hdiffStream.base,0)){
                 out_info->isWindowDiff=hpatch_TRUE;
-                out_info->hdiffInfo.newDataSize=out_info->winDiffInfo.newDataSize;
-                out_info->hdiffInfo.oldDataSize=out_info->winDiffInfo.oldDataSize;
-                out_info->hdiffInfo.compressedCount=(out_info->winDiffInfo.compressedSize>0)?1:0;
                 if (strlen(out_info->winDiffInfo.compressType)==0)
-                    memcpy(out_info->hdiffInfo.compressType,savedCompressType,savedCompressTypeLen+1);
+                    memcpy(out_info->winDiffInfo.compressType,savedCompressType,savedCompressTypeLen+1);
                 else
                     check(0==strcmp(savedCompressType,out_info->winDiffInfo.compressType));
+                _winDiffInfoToHDiffInfo(&out_info->hdiffInfo,&out_info->winDiffInfo);
             }else
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
@@ -182,13 +180,15 @@ static hpatch_BOOL _read_dirdiff_head(TDirDiffInfo* out_info,_TDirDiffHead* out_
                 _singleDiffInfoToHDiffInfo(&out_info->hdiffInfo,&out_info->sdiffInfo);
             }else
 #endif
-            check(getCompressedDiffInfo(&out_info->hdiffInfo,&hdiffStream.base));
-            check(savedOldRefSize==out_info->hdiffInfo.oldDataSize);
-            check(savedNewRefSize==out_info->hdiffInfo.newDataSize);
-            if (strlen(out_info->hdiffInfo.compressType)==0)
-                memcpy(out_info->hdiffInfo.compressType,savedCompressType,savedCompressTypeLen+1); //with '\0'
-            else
-                check(0==strcmp(savedCompressType,out_info->hdiffInfo.compressType));
+            {
+                check(getCompressedDiffInfo(&out_info->hdiffInfo,&hdiffStream.base));
+                check(savedOldRefSize==out_info->hdiffInfo.oldDataSize);
+                check(savedNewRefSize==out_info->hdiffInfo.newDataSize);
+                if (strlen(out_info->hdiffInfo.compressType)==0)
+                    memcpy(out_info->hdiffInfo.compressType,savedCompressType,savedCompressTypeLen+1); //with '\0'
+                else
+                    check(0==strcmp(savedCompressType,out_info->hdiffInfo.compressType));
+            }
         }else{
             memset(&out_info->hdiffInfo,0,sizeof(out_info->hdiffInfo));
             out_info->hdiffInfo.oldDataSize=savedOldRefSize;
@@ -632,6 +632,7 @@ hpatch_BOOL TDirPatcher_patch(TDirPatcher* self,const hpatch_TStreamOutput* out_
         winCtx.temp_cache_end=temp_cache_end;
         winListener.import=&winCtx;
         winListener.onDiffInfo=_dirWin_onDiffInfo;
+        winListener.onPatchFinish=0;
         wResult=patch_window_diff(&winListener,out_newData,oldData,&hdiffData.base,0,threadNum);
         checki(wResult==kWindowPatch_ok,"TDirPatcher_patch() patch_window_diff");
     }else

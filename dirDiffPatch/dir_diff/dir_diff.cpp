@@ -840,12 +840,17 @@ void resave_dirdiff(const hpatch_TStreamInput* in_diff,hpatch_TDecompress* decom
         TOffsetStreamOutput ofStream(out_diff,writeToPos);
         TStreamClip clip(in_diff,head.hdiffDataOffset,head.hdiffDataOffset+head.hdiffDataSize);
         
-        hpatch_singleCompressedDiffInfo singleDiffInfo;
-        hpatch_BOOL isSingleStreamDiff=getSingleCompressedDiffInfo(&singleDiffInfo,&clip,0);
-        if (isSingleStreamDiff){
-            resave_single_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin,&singleDiffInfo);
+        hpatch_windowDiffInfo winDiffInfo;
+        if (getWindowDiffInfo(&winDiffInfo,&clip,0)){
+            resave_window_diff(&clip,decompressPlugin,&ofStream,compressPlugin,0,&winDiffInfo);
         }else{
-            resave_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin);
+            hpatch_singleCompressedDiffInfo singleDiffInfo;
+            hpatch_BOOL isSingleStreamDiff=getSingleCompressedDiffInfo(&singleDiffInfo,&clip,0);
+            if (isSingleStreamDiff){
+                resave_single_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin,&singleDiffInfo);
+            }else{
+                resave_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin);
+            }
         }
         writeToPos+=ofStream.outSize;
     }

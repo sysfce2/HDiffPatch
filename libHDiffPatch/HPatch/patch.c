@@ -2783,6 +2783,9 @@ static hpatch_BOOL _getWindowDiffInfo(hpatch_windowDiffInfo* out_diffInfo,
         return _hpatch_FALSE;
 
     //read header fields
+    _clip_unpackUIntTo(&out_diffInfo->compressedSize,diffHeadClip);
+    out_diffInfo->_headFixedInfoPos=kHeadPrefixSize+_TStreamCacheClip_readPosOfSrcStream(diffHeadClip);
+    _clip_unpackUIntTo(&out_diffInfo->uncompressedSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->newDataSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->oldDataSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->coverCount,diffHeadClip);
@@ -2793,8 +2796,6 @@ static hpatch_BOOL _getWindowDiffInfo(hpatch_windowDiffInfo* out_diffInfo,
     _clip_unpackUIntTo(&out_diffInfo->maxWindowOldSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->checksumByteSize,diffHeadClip);
     _clip_unpackUIntTo(&out_diffInfo->extraDataSize,diffHeadClip);
-    _clip_unpackUIntTo(&out_diffInfo->uncompressedSize,diffHeadClip);
-    _clip_unpackUIntTo(&out_diffInfo->compressedSize,diffHeadClip);
     
     out_diffInfo->otherInfoPos=kHeadPrefixSize+_TStreamCacheClip_readPosOfSrcStream(diffHeadClip);
     if (out_diffInfo->otherInfoPos+out_diffInfo->checksumByteSize*3>out_diffInfo->windowDataPos)

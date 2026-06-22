@@ -2155,7 +2155,8 @@ void get_match_windows_from_baseCovers(hpatch_StreamPos_t newSize,hpatch_StreamP
                                        size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
                                        std::vector<TCover>& baseCovers,std::vector<hpatch_TWindow>& out_windows,
                                        std::vector<std::vector<TCover> >& out_bigCoverss,size_t kBigCoverSize){
-    if (kSegSize==0) kSegSize=kOldWindowSize/16;
+    if (kSegSize==0) kSegSize=kOldWindowSize/kDefaultSegRatioInWindowOldSize;
+    check((kSegSize>0)&&(kSegSize<=kOldWindowSize));
     TWindowMatcher windowMatcher(newSize,oldSize,
                                  kNewWindowSize,kOldWindowSize,kSegSize,baseCovers);
     windowMatcher.search_windows(out_windows);
@@ -2271,6 +2272,8 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
         outDiff.pushBack(out_type.data(),out_type.size());
     }
     //head
+    TPlaceholder compressedSize_ph=outDiff.packUInt_pos(compressPlugin?windowDiffStream.streamSize:0);
+    outDiff.packUInt(windowDiffStream.streamSize);
     outDiff.packUInt(newStream->streamSize);
     outDiff.packUInt(oldStream->streamSize);
     outDiff.packUInt(covers.size());
@@ -2281,8 +2284,6 @@ void serialize_window_diff(const hpatch_TStreamInput* newStream,const hpatch_TSt
     outDiff.packUInt(maxWindowOldSize);
     outDiff.packUInt(checksumByteSize);
     outDiff.packUInt(extraDataSize);
-    outDiff.packUInt(windowDiffStream.streamSize);
-    TPlaceholder compressedSize_ph=outDiff.packUInt_pos(compressPlugin?windowDiffStream.streamSize:0);
 
     // if need to add other info in head, add it here
 
@@ -2402,20 +2403,8 @@ hpatch_StreamPos_t resave_window_diff(const hpatch_TStreamInput*  in_diff,
         outDiff.pushBack(out_type.data(),out_type.size());
     }
     //head
-    outDiff.packUInt(diffInfo->newDataSize);
-    outDiff.packUInt(diffInfo->oldDataSize);
-    outDiff.packUInt(diffInfo->coverCount);
-    outDiff.packUInt(diffInfo->windowCount);
-    outDiff.packUInt(diffInfo->windowMetaCount);
-    outDiff.packUInt(diffInfo->maxStepMemSize);
-    outDiff.packUInt(diffInfo->maxSubCoverCount);
-    outDiff.packUInt(diffInfo->maxWindowOldSize);
-    outDiff.packUInt(checksumByteSize);
-    outDiff.packUInt(diffInfo->extraDataSize);
-    outDiff.packUInt(diffInfo->uncompressedSize);
     TPlaceholder compressedSize_ph=outDiff.packUInt_pos(compressPlugin?diffInfo->uncompressedSize:0);
-
-    TStreamClip hclip(in_diff,in_diff_curPos+diffInfo->otherInfoPos,
+    TStreamClip hclip(in_diff,in_diff_curPos+diffInfo->_headFixedInfoPos,
                       in_diff_curPos+diffInfo->windowDataPos-checksumByteSize);
     outDiff.pushStream(&hclip);
 

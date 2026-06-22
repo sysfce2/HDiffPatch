@@ -1065,11 +1065,7 @@ static int _getHDiffInfos(_THDiffInfos* out_diffInfos,const hpatch_TFileStreamIn
 #if (_IS_NEED_WINDOW_DIFF)
         if (getWindowDiffInfo(&out_diffInfos->winDiffInfo,&diffData->base,0)){
             out_diffInfos->isWindowDiff=hpatch_TRUE;
-            diffInfo->newDataSize=out_diffInfos->winDiffInfo.newDataSize;
-            diffInfo->oldDataSize=out_diffInfos->winDiffInfo.oldDataSize;
-            diffInfo->compressedCount=out_diffInfos->winDiffInfo.compressedSize>0?1:0;
-            memcpy(diffInfo->compressType,out_diffInfos->winDiffInfo.compressType,
-                   strlen(out_diffInfos->winDiffInfo.compressType)+1);
+            _winDiffInfoToHDiffInfo(diffInfo,&out_diffInfos->winDiffInfo);
         }else
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
@@ -1125,7 +1121,7 @@ static void _printHDiffInfos(const _THDiffInfos* diffInfos,hpatch_BOOL isInDirDi
     {
         const char* typeTag="HDiff";
 #if (_IS_NEED_WINDOW_DIFF)
-        if (diffInfos->isWindowDiff) typeTag="WindowDiff";
+        if (diffInfos->isWindowDiff) typeTag="WinDiff";
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
         if (diffInfos->isSingleCompressedDiff) typeTag="SHDiff";
@@ -1159,6 +1155,7 @@ static void _printHDiffInfos(const _THDiffInfos* diffInfos,hpatch_BOOL isInDirDi
 #if (_IS_NEED_WINDOW_DIFF)
     if (diffInfos->isWindowDiff){
         printf("       checksumType: \"%s\"\n",diffInfos->winDiffInfo.checksumType);
+        printf("        windowCount: %" PRIu64 "\n",diffInfos->winDiffInfo.windowCount);
         printf("      maxSrcWindows: %" PRIu64 "\n",diffInfos->winDiffInfo.maxWindowOldSize);
         printf("     maxStepMemSize: %" PRIu64 "\n",diffInfos->winDiffInfo.maxStepMemSize);
     }

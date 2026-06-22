@@ -219,7 +219,7 @@ TWindowMatcher::TWindowMatcher(hpatch_StreamPos_t newSize,hpatch_StreamPos_t old
                                size_t oldWindowSize,size_t kSegSize,std::vector<TCover>& covers)
 :m_newSize(newSize),m_oldSize(oldSize),m_newWindowSize(newWindowSize),m_oldWindowSize(oldWindowSize),
  m_kSegSize(kSegSize),m_covers(covers){
-    check(kSegSize<=oldWindowSize);
+    assert((kSegSize>0)&&(kSegSize<=oldWindowSize));
     hpatch_StreamPos_t splitLen = std::min(m_kSegSize,newWindowSize);
     splitLen=((newWindowSize<splitLen)?newWindowSize:splitLen);
     _splitLargeCovers(m_covers,splitLen);

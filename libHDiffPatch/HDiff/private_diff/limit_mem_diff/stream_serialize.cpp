@@ -1114,10 +1114,8 @@ TWindowDiffStream::TWindowDiffStream(const hpatch_TStreamInput* newStream,const 
             window.newLength=newDataSize-window.newPos;
 
         const hpatch_StreamPos_t windowEnd=window.newPos+window.newLength;
-        const TCover* coverEnd=std::lower_bound(covers._covers+coveri,
-            covers._covers+covers._coverCount,
-            windowEnd,cover_cmp_by_new_t<TCover>());
-        size_t curCoverEndi=coverEnd-covers._covers;
+        const TCover* coverEnd=std::lower_bound(&covers[coveri],&covers[covers.size()],windowEnd,cover_cmp_by_new_t<TCover>());
+        size_t curCoverEndi=coverEnd-&covers[0];
 
         const hpatch_StreamPos_t windowNewPos=window.newPos;
         const hpatch_StreamPos_t windowOldPos=window.oldPos;
