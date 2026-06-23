@@ -1,5 +1,5 @@
 # [HDiffPatch]
-[![release](https://img.shields.io/badge/release-v4.12.2-blue.svg)](https://github.com/sisong/HDiffPatch/releases) 
+[![release](https://img.shields.io/badge/release-v5.0.0-blue.svg)](https://github.com/sisong/HDiffPatch/releases) 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/sisong/HDiffPatch/blob/master/LICENSE) 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](https://github.com/sisong/HDiffPatch/pulls)
 [![+issue Welcome](https://img.shields.io/github/issues-raw/sisong/HDiffPatch?color=green&label=%2Bissue%20welcome)](https://github.com/sisong/HDiffPatch/issues)   
@@ -10,7 +10,7 @@
 
 [HDiffPatch] is a C\C++ library and command-line tools for **diff** & **patch** between binary files or directories(folder); cross-platform; fast running; create small delta/differential; support large files and limit memory requires when diff & patch.   
 
-[HDiffPatch] defines its own patch file format, this lib is also compatible with the [bsdiff4] & [endsley/bsdiff] patch file format and [partially compatible](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843) with the [open-vcdiff] & [xdelta3] patch file format [VCDIFF(RFC 3284)].   
+[HDiffPatch] defines its own patch file format, this lib is also compatible with the [bsdiff4] & [endsley/bsdiff] patch file format and [compatible](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843) with the [open-vcdiff] & [xdelta3] patch file format [VCDIFF(RFC 3284)].   
 
 if need patch (OTA) on embedded systems,MCU,NB-IoT..., see demo [HPatchLite], +[tinyuz] decompressor can run on 1KB RAM devices! HPatchLite also supports a simple inplace-patch implementation to support storage-constrained devices.   
 
@@ -47,48 +47,37 @@ NOTE: *This library does not deal with file metadata, such as file last write ti
 ## Releases/Binaries
 [Download from latest release](https://github.com/sisong/HDiffPatch/releases) : Command line app for Windows, Linux, MacOS; and .so patch lib for Android.   
 use cmdline to create a delta:   
-`$hdiffz -m-4 -SD -c-zstd-21-24 -d oldPath newPath outDiffFile`   
-if file is very large, try changing `-m-4` to `-s-64`   
+`$hdiffz oldPath newPath outDiffFile -WD -s-64`   
+Tip: If you want a more precise match (which might use more memory), you could try changing `-s-64` to `-m-4`   
 apply the delta:   
 `$hpatchz oldPath diffFile outNewPath`   
-
+Tip: `-WD` format supports multi-thread to speed up patching, for example add `-p-5` parameter (multi-thread not recommended on HDD)   
 ## Build it yourself
-`$ cd <dir>/HDiffPatch`   
-### Linux or MacOS X ###
-Try:   
-`$ make LDEF=0 LZMA=0 ZSTD=0 MD5=0 XXH=0`   
-bzip2 : if the build fails with `fatal error: bzlib.h: No such file or directory`, use your system's package manager to install the libbz2 package and try again; or download & make with libbz2 source code:
 ```
-$ git clone https://github.com/sisong/bzip2.git ../bzip2
-$ make LDEF=0 LZMA=0 ZSTD=0 MD5=0 XXH=0 BZIP2=1
+cd <code_dir>
+git clone https://github.com/sisong/HDiffPatch.git  HDiffPatch
+git clone https://github.com/sisong/libmd5.git  libmd5
+git clone https://github.com/sisong/xxHash.git  xxHash
+git clone https://github.com/sisong/lzma.git  lzma
+git clone https://github.com/sisong/zstd.git  zstd
+git clone https://github.com/sisong/zlib.git  zlib
+git clone https://github.com/sisong/libdeflate.git  libdeflate
+git clone https://github.com/sisong/bzip2.git  bzip2
 ```
-if need lzma zstd & md5 xxh... default support, Try:
+
+### Linux or MacOS ###
 ```
-$ git clone https://github.com/sisong/libmd5.git ../libmd5
-$ git clone https://github.com/sisong/xxHash.git ../xxHash
-$ git clone https://github.com/sisong/lzma.git ../lzma
-$ git clone https://github.com/sisong/zstd.git ../zstd
-$ git clone https://github.com/sisong/zlib.git ../zlib
-$ git clone https://github.com/sisong/libdeflate.git ../libdeflate
-$ make
-```    
-Tip: You can use `$ make -j` to compile in parallel.
+cd HDiffPatch
+make -j
+```
+on MacOS, also can build `HDiffPatch/builds/xcode/HDiffPatch.xcworkspace` by [`xcode`](https://developer.apple.com/xcode)   
    
 ### Windows ###
-Before you build `builds/vc/HDiffPatch.sln` by [`Visual Studio`](https://visualstudio.microsoft.com), first get the libraries into sibling folders, like so: 
-```
-$ git clone https://github.com/sisong/libmd5.git ../libmd5
-$ git clone https://github.com/sisong/xxHash.git ../xxHash
-$ git clone https://github.com/sisong/lzma.git ../lzma
-$ git clone https://github.com/sisong/zstd.git ../zstd
-$ git clone https://github.com/sisong/zlib.git   ../zlib
-$ git clone https://github.com/sisong/libdeflate.git ../libdeflate
-$ git clone https://github.com/sisong/bzip2.git  ../bzip2
-```
+build `HDiffPatch/builds/vc/HDiffPatch.sln` by [`Visual Studio`](https://visualstudio.microsoft.com)
    
 ### libhpatchz.so for Android ###   
 * install [Android NDK](https://developer.android.google.cn/ndk/downloads)
-* `$ cd <dir>/HDiffPatch/builds/android_ndk_jni_mk`
+* `$ cd HDiffPatch/builds/android_ndk_jni_mk`
 * `$ build_libs.sh`  (or `$ build_libs.bat` on windows, then got \*.so files)
 * import file `com/github/sisong/HPatch.java` (from `HDiffPatch/builds/android_ndk_jni_mk/java/`) & .so files, java code can call the patch function in libhpatchz.so
    
@@ -122,14 +111,30 @@ options:
       if set -block-0, means don't use block match;
       fastMatchBlockSize>=4, recommended 128,4k,64k, etc...
       if newData similar to oldData then diff speed++ & diff memory--,
-      but small possibility outDiffFile's size+
+      but small possibility outDiffFile size+
   -cache
       must run with -m;
       set is use a big cache for slow match, DEFAULT false;
       if newData not similar to oldData then diff speed++,
       big cache max used O(oldFileSize) memory, and build slow(diff speed--)
+  -w[-oldWinSize-segSize]
+      diff by window mode; optimize read old data when patch;
+        in -m mode, outDiffFile size+, in -s mode, outDiffFile size-- & patch speed-;
+        if oldWinSize+ or segSize-, outDiffFile size-, but diff & patch speed--
+      oldWinSize: max window bytes on old data, DEFAULT -w-2m;
+        for big file, recommended -w-4m-128k, -w-16m-256k, etc...
+      segSize: initial data granularity during window matching, DEFAULT oldWinSize/64;
+        recommended oldWinSize/128<=segSize<=oldWinSize/4;
+  -WD[-stepSize]                (need v5.0 patcher)
+      create window diffData(HDIFFW26), optimize read old data when patch;
+      recommended as the primary diff format; when patch, and support step by step
+        patching when step by step downloading! and supports multi-thread patching!
+      requires diff by window mode, auto enable -w if not set;
+      default compress by zstd, can set -c-no for no compress;
+      default checksum by xxh128, can set -C-no for no checksum;
+      stepSize>=(1024*4), DEFAULT -WD-256k, recommended 128k,512k etc...
   -SD[-stepSize]
-      create single compressed diffData, only need one decompress buffer
+      create single compressed diffData(HDIFFSF20 format), only need one decompress buffer
       when patch, and support step by step patching when step by step downloading!
         and supports multi-thread patching!
       stepSize>=(1024*4), DEFAULT -SD-256k, recommended 64k,2m etc...
@@ -141,10 +146,11 @@ options:
       create diffFile compatible with VCDIFF, unsupport input directory(folder).
       DEFAULT no compress, out format same as $open-vcdiff ... or $xdelta3 -S -e -n ...
       if set compressLevel, out format same as $xdelta3 -S lzma -e -n ...
-      compress by 7zXZ(xz), compressLevel in {0..9}, DEFAULT level 7;
+      compress by 7zXZ(xz,lzma), compressLevel in {0..9}, DEFAULT level 7;
       dictSize can like 4096 or 4k or 4m or 16m etc..., DEFAULT 8m
       support compress by multi-thread parallel.
-      NOTE: out diffFile used large source window size!
+      NOTE: default out diffFile used large source window size!
+        need used -w[-oldWinSize-segSize-newWinSize] to set source/segment/target window size.
   -p-parallelThreadNumber
       if parallelThreadNumber>1 then open multi-thread Parallel mode;
       DEFAULT -p-4; requires more memory!
@@ -156,8 +162,10 @@ options:
         search mode or reduce the number of searchThreadNumber!
   -c-compressType[-compressLevel]
       set outDiffFile Compress type, DEFAULT uncompress;
+      for -WD, DEFAULT compress by zstd;
       for resave diffFile,recompress diffFile to outDiffFile by new set;
       support compress type & level & dict:
+        -c-no                           no compress
         -c-zlib[-{1..9}[-dictBits]]     DEFAULT level 9
             dictBits can 9--15, DEFAULT 15.
             support run by multi-thread parallel, fast!
@@ -180,11 +188,12 @@ options:
             dictBits can 10--30, DEFAULT 23.
             support run by multi-thread parallel, fast!
   -C-checksumType
-      set outDiffFile Checksum type for directory diff, DEFAULT -C-fadler64;
+      set outDiffFile Checksum type, for directory diff, DEFAULT -C-fadler64; for -WD, DEFAULT -C-xxh128;
+      (if need checksum for diff between two files, add -D)
       support checksum type:
         -C-no                   no checksum
         -C-crc32
-        -C-fadler64             DEFAULT
+        -C-fadler64
         -C-md5
         -C-xxh3                 (need v4.12 patcher)
         -C-xxh128               recommended (need v4.12 patcher)
@@ -265,16 +274,14 @@ options:
       now only support single compressed diffData(created by hdiffz -SD-stepSize);
       can set 1..5, DEFAULT -p-1!
   -C-checksumSets
-      set Checksum data for directory patch, DEFAULT -C-new-copy;
+      set Checksum data for window patch & directory patch & VCDIFF patch, DEFAULT -C-new-copy;
       checksumSets support (can choose multiple):
-        -C-diff         checksum diffFile;
-        -C-old          checksum old reference files;
-        -C-new          checksum new files edited from old reference files;
-        -C-copy         checksum new files copy from old same files;
         -C-no           no checksum;
-        -C-all          same as: -C-diff-old-new-copy;
-  -C-no or -C-new
-      if diffFile is VCDIFF, then to close or open checksum, DEFAULT -C-new.
+        -C-new          checksum new files edited from old reference files;
+        -C-diff         checksum diffFile; (VCDIFF unsupport)
+        -C-old          checksum old reference files; (VCDIFF unsupport)
+        -C-copy         checksum new files copy from old same files, for directory patch;
+        -C-all          same as: -C-new-copy-diff-old;
   -n-maxOpenFileNumber
       limit Number of open files at same time when stream directory patch;
       maxOpenFileNumber>=8, DEFAULT -n-24, the best limit value by different
@@ -310,7 +317,7 @@ options:
 * **patch()**
 * **patch_stream()**
 * **patch_stream_with_cache()**
-### v2 API, compressed diffData:
+### v2 API, compressed diffData (HDIFF13):
 * **create_compressed_diff()**
 * **create_compressed_diff_stream()**
 * **resave_compressed_diff()**
@@ -320,7 +327,7 @@ options:
 ### v3 API, **diff**&**patch** between directories(folder):
 * **dir_diff()**
 * **TDirPatcher_\*()** functions with **struct TDirPatcher**
-### v4 API, single compressed diffData:
+### v4 API, single compressed diffData (HDIFFSF20):
 * **create_single_compressed_diff()**
 * **create_single_compressed_diff_stream()**
 * **resave_single_compressed_diff()**
@@ -328,6 +335,10 @@ options:
 * **patch_single_stream_mem()**
 * **patch_single_compressed_diff()**
 * **patch_single_stream_diff()**
+### v5 API, window diffData (HDIFFW26):
+* **create_window_diff()**
+* **patch_window_diff()**
+* **resave_window_diff()**
 #### hpatch lite API, optimized hpatch on MCU,NB-IoT... (demo [HPatchLite]): 
 * **create_lite_diff()**
 * **hpatch_lite_open()**

@@ -108,8 +108,6 @@
 #include "decompress_plugin_demo.h"
 
 
-#if (_IS_NEED_DIR_DIFF_PATCH)
-
 #ifndef _IS_NEED_DEFAULT_ChecksumPlugin
 #   define _IS_NEED_DEFAULT_ChecksumPlugin 1
 #endif
@@ -135,7 +133,6 @@
 #endif
 
 #include "checksum_plugin_demo.h"
-#endif
 
 static void printVersion(){
     printf("HDiffPatch::hdiffz v" HDIFFPATCH_VERSION_STRING "\n");
@@ -201,6 +198,10 @@ static void printUsage(){
            "      requires diff by window mode, auto enable -w if not set;\n"
 #ifdef _CompressPlugin_zstd
            "      default compress by zstd, can set -c-no for no compress;\n"
+#else
+#   ifdef _CompressPlugin_zlib
+           "      default compress by zlib, can set -c-no for no compress;\n"
+#   endif
 #endif
 #ifdef _ChecksumPlugin_xxh128
            "      default checksum by xxh128, can set -C-no for no checksum;\n"
@@ -238,7 +239,7 @@ static void printUsage(){
            "      out format same as $open-vcdiff ... or $xdelta3 -S -e -n ...\n"
 #   endif
            "      NOTE: default out diffFile used large source window size! \n"
-           "        need used -w[-oldWinSize-segSize-newSize] to set source/segment/target window size.\n"
+           "        need used -w[-oldWinSize-segSize-newWinSize] to set source/segment/target window size.\n"
 #endif
 #if (_IS_USED_MULTITHREAD)
            "  -p-parallelThreadNumber\n"
@@ -253,10 +254,16 @@ static void printUsage(){
 #endif
            "  -c-compressType[-compressLevel]\n"
            "      set outDiffFile Compress type, DEFAULT uncompress;\n"
+#ifdef _CompressPlugin_zstd
            "      for -WD, DEFAULT compress by zstd;\n"
+#else
+#   ifdef _CompressPlugin_zlib
+           "      for -WD, DEFAULT compress by zlib;\n"
+#   endif
+#endif
            "      for resave diffFile,recompress diffFile to outDiffFile by new set;\n"
            "      support compress type & level & dict:\n"
-           "        -c-no                       no compress\n"
+           "        -c-no                           no compress\n"
 #ifdef _CompressPlugin_zlib
            "        -c-zlib[-{1..9}[-dictBits]]     DEFAULT level 9\n"
            "            dictBits can 9--15, DEFAULT 15.\n"
@@ -335,27 +342,21 @@ static void printUsage(){
            "for directory diff, DEFAULT no checksum;"
 #   endif
 #endif
+#endif //_IS_NEED_DIR_DIFF_PATCH
 #ifdef _ChecksumPlugin_xxh128
-           "      for -WD, DEFAULT -C-xxh128;"
+           " for -WD, DEFAULT -C-xxh128;"
 #else
 #   ifdef _ChecksumPlugin_xxh3
-           "      for -WD, DEFAULT -C-xxh3;"
+           " for -WD, DEFAULT -C-xxh3;"
 #   else
-           "      for -WD, DEFAULT no checksum;"
+           " for -WD, DEFAULT no checksum;"
 #   endif
 #endif
            "\n"
-#if (_IS_NEED_DIR_DIFF_PATCH)
-           "      (if need checksum for diff between two files, add -D)\n"
-#endif
            "      support checksum type:\n"
            "        -C-no                   no checksum\n"
 #ifdef _ChecksumPlugin_crc32
-#   ifdef _ChecksumPlugin_fadler64
            "        -C-crc32\n"
-#   else
-           "        -C-crc32                DEFAULT\n"
-#   endif
 #endif
 #ifdef _ChecksumPlugin_adler32
            "        -C-adler32\n"
@@ -367,7 +368,7 @@ static void printUsage(){
            "        -C-fadler32\n"
 #endif
 #ifdef _ChecksumPlugin_fadler64
-           "        -C-fadler64             DEFAULT\n"
+           "        -C-fadler64\n"
 #endif
 #ifdef _ChecksumPlugin_fadler128
            "        -C-fadler128\n"
@@ -384,6 +385,7 @@ static void printUsage(){
 #ifdef _ChecksumPlugin_xxh128
            "        -C-xxh128               recommended (need v4.12 patcher)\n"
 #endif
+#if (_IS_NEED_DIR_DIFF_PATCH)
            "  -n-maxOpenFileNumber\n"
            "      limit Number of open files at same time when stream directory diff;\n"
            "      maxOpenFileNumber>=16, DEFAULT -n-48, the best limit value by different\n"
@@ -611,7 +613,6 @@ static hpatch_BOOL findDecompress(hpatch_TDecompress* out_decompressPlugin,const
     return hpatch_TRUE;
 }
 
-#if (_IS_NEED_DIR_DIFF_PATCH)
 static inline hpatch_BOOL _trySetChecksum(hpatch_TChecksum** out_checksumPlugin,const char* checksumType,
                                           hpatch_TChecksum* testChecksumPlugin){
     assert(0==*out_checksumPlugin);
@@ -667,8 +668,6 @@ static hpatch_BOOL _getOptChecksum(hpatch_TChecksum** out_checksumPlugin,
         return findChecksum(out_checksumPlugin,checksumType);
 }
 
-#endif //_IS_NEED_DIR_DIFF_PATCH
-
 
 static bool _tryGetCompressSet(const char** isMatchedType,const char* ptype,const char* ptypeEnd,
                                const char* cmpType,const char* cmpType2=0,
@@ -718,6 +717,7 @@ static bool _tryGetCompressSet(const char** isMatchedType,const char* ptype,cons
 static int _checkSetCompress(hdiff_TCompress** out_compressPlugin,
                              const char* ptype,const char* ptypeEnd){
     // -c-no means explicit no compress
+    if (ptypeEnd==0) ptypeEnd=ptype+strlen(ptype);
     if ((ptypeEnd-ptype==2)&&(0==strncmp(ptype,"no",2))){
         *out_compressPlugin=0;
         return HDIFF_SUCCESS;
@@ -1283,16 +1283,15 @@ int hdiff_cmd_line(int argc, const char * argv[]){
         diffSets.threadNumSearch_s=_THREAD_NUMBER_MAX;
     else if (diffSets.threadNumSearch_s<1)
         diffSets.threadNumSearch_s=1;
-    if (compressPlugin!=0){
-        compressPlugin->setParallelThreadNumber(compressPlugin,(int)diffSets.threadNum);
-    }
     
     if (diffSets.isWindowDiff){// -WD default compress & checksum
         if ((compressPlugin==0) && (!isSetCompress)){
 #ifdef _CompressPlugin_zstd
-            static TCompressPlugin_zstd _zstdCompressPlugin=zstdCompressPlugin;
-            compressPlugin=&_zstdCompressPlugin.base;
-            compressPlugin->setParallelThreadNumber(compressPlugin,(int)diffSets.threadNum);
+            _checkSetCompress(&compressPlugin,"zstd",0);
+#else
+    #ifdef _CompressPlugin_zlib
+            _checkSetCompress(&compressPlugin,"zlib",0); 
+    #endif
 #endif
         }
         if ((checksumPlugin==0) && (!isSetChecksum)){
@@ -1304,6 +1303,9 @@ int hdiff_cmd_line(int argc, const char * argv[]){
     #endif
 #endif
         }
+    }
+    if (compressPlugin!=0){
+        compressPlugin->setParallelThreadNumber(compressPlugin,(int)diffSets.threadNum);
     }
     
     if (isOldPathInputEmpty==_kNULL_VALUE)
@@ -1387,14 +1389,14 @@ int hdiff_cmd_line(int argc, const char * argv[]){
 #   endif
 #endif
         }else
+#endif //_IS_NEED_DIR_DIFF_PATCH
         {
             if (!diffSets.isWindowDiff)
-                _options_check(checksumPlugin==0,"-C now only support dir diff or -WD, unsupport diff");
+                _options_check(checksumPlugin==0,"-C now only support dir diff or -WD, unsupport diff data");
         }
-#endif //_IS_NEED_DIR_DIFF_PATCH
 
-    if (!diffSets.isDoDiff)
-        diffSets.isDiffInMem=hpatch_FALSE; //all check diffFile (-t) run with stream;
+        if (!diffSets.isDoDiff)
+            diffSets.isDiffInMem=hpatch_FALSE; //all check diffFile (-t) run with stream;
 
 #if (_IS_NEED_DIR_DIFF_PATCH)
         if (isUseDirDiff){
@@ -1922,8 +1924,6 @@ int hdiff_resave(const char* diffFileName,const char* outDiffFileName,
                   "found checksum plugin not same as dirDiffFile used: \""+dirDiffInfo.checksumType+"\"\n");
         }
         printf("resave dirDiffFile with checksum plugin: \"%s\"\n",dirDiffInfo.checksumType);
-    }else if (!isWindowDiff){
-        _options_check(checksumPlugin==0,"-C now only support dir diff or window diff");
     }
 #endif
 
