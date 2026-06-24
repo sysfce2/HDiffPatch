@@ -1825,7 +1825,7 @@ int hdiff(const char* oldFileName,const char* newFileName,const char* outDiffFil
                                 compressPlugin->compressTypeForDisplay():compressPlugin->compressType();
         printf("  compress plugin: \"%s\"\n",compressTypeTxt);
         if (checksumPlugin)
-            printf("  checksum: %s\n",checksumPlugin->checksumType());
+            printf("  checksum plugin: %s\n",checksumPlugin->checksumType());
     }
     
     int exitCode=hdiff_by_stream(oldFileName,newFileName,outDiffFileName,

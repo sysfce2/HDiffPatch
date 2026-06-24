@@ -430,8 +430,8 @@ static hpatch_BOOL _toChecksumSet(const char* psets,TPatchChecksumSet* checksumS
         printHelpInfo(); return HPATCH_OPTIONS_ERROR; } }
 
 #define kPatchCacheSize_min      (hpatch_kStreamCacheSize*8)
-#define kPatchCacheSize_bestmin  ((size_t)1<<21)
 #define kPatchCacheSize_default  ((size_t)1<<23)
+#define kPatchCacheSize_bestmin  kPatchCacheSize_default
 
 #define _kNULL_VALUE    (-1)
 #define _kNULL_SIZE     (~(size_t)0)

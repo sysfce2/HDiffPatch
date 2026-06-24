@@ -99,7 +99,7 @@ static const size_t kDefaultFastMatchBlockSize = 1024*1;
 
 static const size_t kMatchWindowsBlockSize_default = (1<<6);
 static const size_t kDefaultBigCoverSize = 1024*16;
-static const size_t kDefaultWindowOldSize = 1024*512;
+static const size_t kDefaultWindowOldSize = 1024*1024*2;
 static const size_t kDefaultSegRatioInWindowOldSize = 64; // default segSize=windowOldSize/kDefaultSegRatioInWindowOldSize
 
 //create a compressed diff data by window mode:

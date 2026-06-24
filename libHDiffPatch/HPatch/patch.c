@@ -2131,7 +2131,6 @@ hpatch_BOOL _patch_single_compressed_diff_mt(const hpatch_TStreamOutput* out_new
     diffData_posEnd=(decompressPlugin?compressedSize:uncompressedSize)+diffData_pos;
     if (diffData_posEnd>singleCompressedDiff->streamSize) return _hpatch_FALSE;
 #if (_HPATCH_IS_USED_MULTITHREAD)
-    mtsets.decompressDiff_isMT=decompressPlugin? mtsets.decompressDiff_isMT:0;
     if (_hpatchMTSets_threadNum(mtsets)>1){
         isNeedOutCache=!mtsets.writeNew_isMT;
         kCacheCount=_kCacheSgCount-(isNeedOutCache?0:1);
@@ -2948,7 +2947,6 @@ static hpatch_BOOL _patch_window_diff(const hpatch_TStreamOutput* out_newData,co
     mtsets=hpatch_getMTSets_win(out_newData->streamSize,oldData->streamSize,diffStream->streamSize-diffData_pos,
                                 decompressPlugin,_kWindowCacheCount,windowOldBufSize,stepMemSize,
                                 (temp_cache_end-temp_cache),maxThreadNum,hpatchMTSets);
-    mtsets.decompressDiff_isMT=decompressPlugin? mtsets.decompressDiff_isMT:0;
     if (_hpatchMTSets_threadNum(mtsets)>1){
         isNeedOutCache=!mtsets.writeNew_isMT;
         kCacheCount=_kWindowCacheCount-(isNeedOutCache?0:1);
@@ -3242,7 +3240,7 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
     }
 
     patch_result=_patch_window_diff(effectiveOutNew,oldData,effectiveDiffStream,diffInfo_pos+diffInfo.windowDataPos,
-                                    &diffInfo,decompressPlugin,checksumPlugin,checksumHandle_old,
+                                    &diffInfo,decompressPlugin,checksumHandle_old?checksumPlugin:0,checksumHandle_old,
                                     temp_cache,temp_cacheEnd, threadNum,hpatchMTSets_full);
 
     {//verify checksums

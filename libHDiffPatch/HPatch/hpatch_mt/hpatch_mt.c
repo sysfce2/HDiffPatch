@@ -165,7 +165,7 @@ hpatchMTSets_t _hpatch_getMTSets(hpatch_StreamPos_t newSize,hpatch_StreamPos_t o
         }else{
             kMinTempCacheSize=objsMemSize+kBetterBufNodeSize*(workBufCount+kCacheCount)+(kAlignSize-1);
             if (_patch_is_can_cache_window_old_canUsedSize(windowOldBufSize,stepMemSize,kMinTempCacheSize,
-                                                           temp_cacheSumSize,oldSize)>0){
+                                                           temp_cacheSumSize,oldSize)<=0){
                 mtsets.readOld_isMT=0; // not use MT.
             }
         }

@@ -444,7 +444,7 @@ static void _writeVcdiffWindowDelta(TDiffStream& outDiff,std::vector<hpatch_byte
 static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                      const TInputCovers& covers,const std::vector<hpatch_TWindow>& matchWindows,
                                      const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                                     size_t kMaxTargetWindowsSize,size_t kMaxSrcWindowsSize=~(size_t)0,bool isWriteHDiffzTag=true){
+                                     size_t kMaxTargetWindowsSize,size_t kMaxSrcWindowsSize=~(size_t)0){
     _out_diff_info("  serialize VCDIFF diffData ...\n");
     std::vector<hpatch_byte> buf;
     TDiffStream outDiff(out_diff);
@@ -461,7 +461,7 @@ static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hp
         if (isHaveCompresser)//VCD_DECOMPRESS
             buf.push_back(compressPlugin->compress_type);
         { //VCD_APPHEADER   // add HDiffzAppHead tag to out_diff
-            const std::string HDiffzAppHead=isWriteHDiffzTag?getHDiffzAppHead(compressPlugin):"";
+            const std::string HDiffzAppHead=getHDiffzAppHead(compressPlugin);
             packUInt(buf,HDiffzAppHead.size());
             pushCStr(buf,HDiffzAppHead.c_str());
         }
@@ -664,8 +664,7 @@ void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStrea
                                 isCollateMergeCover,covers,windows,
                                 kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
                                 isUseBigCacheMatch,mtsets,isExtendCover);
-    const bool isWriteHDiffzTag=false;
-    serialize_vcdiff_windows(newData,oldData,covers,windows,out_diff,compressPlugin,kNewWindowSize,kOldWindowSize,isWriteHDiffzTag);
+    serialize_vcdiff_windows(newData,oldData,covers,windows,out_diff,compressPlugin,kNewWindowSize,kOldWindowSize);
 }
 
 
