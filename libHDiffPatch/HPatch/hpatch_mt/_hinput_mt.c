@@ -27,6 +27,7 @@
 */
 #include "_hinput_mt.h"
 #include "_patch_private_mt.h"
+#include "_hcache_window_old_mt.h"
 #if (_IS_USED_MULTITHREAD)
 
 typedef struct hinput_mt_t{

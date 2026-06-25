@@ -1,5 +1,5 @@
 # [HDiffPatch]
-[![release](https://img.shields.io/badge/release-v4.12.2-blue.svg)](https://github.com/sisong/HDiffPatch/releases) 
+[![release](https://img.shields.io/badge/release-v5.0.0-blue.svg)](https://github.com/sisong/HDiffPatch/releases) 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/sisong/HDiffPatch/blob/master/LICENSE) 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](https://github.com/sisong/HDiffPatch/pulls)
 [![+issue Welcome](https://img.shields.io/github/issues-raw/sisong/HDiffPatch?color=green&label=%2Bissue%20welcome)](https://github.com/sisong/HDiffPatch/issues)   
@@ -10,7 +10,7 @@
 
 [HDiffPatch] 是一个C\C++库和命令行工具，用于在二进制文件或文件夹之间执行 **diff**(创建补丁) 和 **patch**(打补丁)；跨平台、运行速度快、创建的补丁小、支持巨大的文件并且diff和patch时都可以控制内存占用量。   
 
-[HDiffPatch] 定义了自己的补丁包格式，同时这个库也完全兼容了 [bsdiff4] 和 [endsley/bsdiff] 的补丁包格式，并[部分兼容](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843)了 [open-vcdiff] 和 [xdelta3] 的补丁包格式 [VCDIFF(RFC 3284)]。   
+[HDiffPatch] 定义了自己的补丁包格式，同时这个库也完全兼容了 [bsdiff4] 和 [endsley/bsdiff] 的补丁包格式，并[兼容](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843)了 [open-vcdiff] 和 [xdelta3] 的补丁包格式 [VCDIFF(RFC 3284)]。   
 
 如果你需要在嵌入式系统(MCU、NB-IoT)等设备上进行增量更新(OTA), 可以看看例子 [HPatchLite], +[tinyuz] 解压缩器可以在1KB内存的设备上运行! HPatchLite也支持一种简单的原地更新(inplace-patch)实现，用以支持存储受限的设备。   
 
@@ -47,48 +47,38 @@ hsynz 支持 zstd 压缩算法并且比 zsync 速度快得多；而且可以兼�
 ## 二进制发布包
 [从 release 下载](https://github.com/sisong/HDiffPatch/releases) : 命令行程序分别运行在 Windows、Linux、MacOS操作系统。 .so库文件用于安卓。   
 用命令行创建一个补丁:   
-`$hdiffz -m-6 -SD -c-zstd-21-24 -d oldPath newPath outDiffFile`   
-如果文件非常大，可以试试将 `-m-6` 改为 `-s-64`   
+`$hdiffz oldPath newPath outDiffFile -WD -s-64`   
+提示：如果想获得更精确的匹配(可能占用更多内存)可以试试将 `-s-64` 改为 `-m-4`   
 打补丁:   
 `$hpatchz oldPath diffFile outNewPath`   
+提示：`-WD`格式支持多线程加快patch速度，比如添加`-p-5`参数（HDD磁盘上不推荐开启多线程）。
 
 ## 自己编译
-`$ cd <dir>/HDiffPatch`   
-### Linux or MacOS X ###
-试试:   
-`$ make LDEF=0 LZMA=0 ZSTD=0 MD5=0 XXH=0`   
-bzip2 : 如果编译失败，显示 `fatal error: bzlib.h: No such file or directory`，请使用系统的包管理器安装libbz2，然后再试一次；或者下载并使用libbz2源代码来编译:
 ```
-$ git clone https://github.com/sisong/bzip2.git ../bzip2
-$ make LDEF=0 LZMA=0 ZSTD=0 MD5=0 XXH=0 BZIP2=1
+cd <code_dir>
+git clone https://github.com/sisong/HDiffPatch.git  HDiffPatch
+git clone https://github.com/sisong/libmd5.git  libmd5
+git clone https://github.com/sisong/xxHash.git  xxHash
+git clone https://github.com/sisong/lzma.git  lzma
+git clone https://github.com/sisong/zstd.git  zstd
+git clone https://github.com/sisong/zlib.git  zlib
+git clone https://github.com/sisong/libdeflate.git  libdeflate
+git clone https://github.com/sisong/bzip2.git  bzip2
 ```
-如果需要支持 lzma、zstd 和 md5 xxh 等 默认编译设置，试试:    
+
+### Linux or MacOS ###
 ```
-$ git clone https://github.com/sisong/libmd5.git ../libmd5
-$ git clone https://github.com/sisong/xxHash.git ../xxHash
-$ git clone https://github.com/sisong/lzma.git ../lzma
-$ git clone https://github.com/sisong/zstd.git ../zstd
-$ git clone https://github.com/sisong/zlib.git ../zlib
-$ git clone https://github.com/sisong/libdeflate.git ../libdeflate
-$ make
-```    
-提示:你可以使用 `$ make -j` 来并行编译。
+cd HDiffPatch
+make -j
+```
+在MacOS系统上,也可以使用 [`xcode`](https://developer.apple.com/xcode) 打开 `HDiffPatch/builds/xcode/HDiffPatch.xcworkspace` 来编译。   
    
 ### Windows ###
-使用 [`Visual Studio`](https://visualstudio.microsoft.com) 打开 `builds/vc/HDiffPatch.sln` 来编译之前，先将第三方库下载到同级文件夹中，如下所示: 
-```
-$ git clone https://github.com/sisong/libmd5.git ../libmd5
-$ git clone https://github.com/sisong/xxHash.git ../xxHash
-$ git clone https://github.com/sisong/lzma.git ../lzma
-$ git clone https://github.com/sisong/zstd.git ../zstd
-$ git clone https://github.com/sisong/zlib.git   ../zlib
-$ git clone https://github.com/sisong/libdeflate.git ../libdeflate
-$ git clone https://github.com/sisong/bzip2.git  ../bzip2
-```
+使用 [`Visual Studio`](https://visualstudio.microsoft.com) 打开 `HDiffPatch/builds/vc/HDiffPatch.sln` 来编译。
    
 ### libhpatchz.so for Android ###   
 * 安装 [Android NDK](https://developer.android.google.cn/ndk/downloads)
-* `$ cd <dir>/HDiffPatch/builds/android_ndk_jni_mk`
+* `$ cd HDiffPatch/builds/android_ndk_jni_mk`
 * `$ build_libs.sh`  (或者 Windows下执行 `$ build_libs.bat`, 就可以得到 \*.so 安卓库了)
 * 在你的安卓项目中添加 `com/github/sisong/HPatch.java` (所在路径 `HDiffPatch/builds/android_ndk_jni_mk/java/`) 和 .so 文件， java 代码就可以调用 libhpatchz.so 中的 patch 函数了。
    
@@ -110,7 +100,7 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
   -m[-matchScore]
       默认选项; 所有文件都会被加载到内存; 一般生成的补丁文件比较小;
       需要的内存大小:(新版本文件大小+ 旧版本文件大小*5(或*9 当旧版本文件大小>=2GB时))+O(1);
-      匹配分数matchScore>=0,默认为6,二进制数据时推荐设置为0到4,文件数据时推荐4--9等,跟输入
+      匹配分数matchScore>=0,默认为4,二进制数据时推荐设置为0到4,文件数据时推荐4--9等,跟输入
       数据的可压缩性相关,一般输入数据的可压缩性越大,这个值就可以越大。
   -s[-matchBlockSize]
       所有文件当作文件流加载;一般速度比较快;
@@ -130,8 +120,23 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
       如果新版本和旧版本不相同数据比较多,那diff速度就会比较快;
       该大型缓冲区最大占用O(旧版本文件大小)的内存, 并且需要较多的时间来创建(从而可能降低diff速度)。
   -SD[-stepSize]
-      创建单压缩流的补丁文件, 这样patch时就只需要一个解压缩缓冲区, 并且可以支持边下载边patch,
-      并支持多线程patch; 压缩步长stepSize>=(1024*4), 默认为256k, 推荐64k,2m等。
+      创建单压缩流的补丁文件(HDIFFSF20格式), 这样patch时就只需要一个解压缩缓冲区, 并且可以
+      支持边下载边patch, 并支持多线程patch; 压缩步长stepSize>=(1024*4), 默认为256k, 推荐64k,2m等。
+  -w[-oldWinSize-segSize]
+      窗口模式diff, 优化patch时old data的读取访问;
+        在 -m 模式下, 补丁文件会稍大, 在 -s 模式下, 补丁文件更小但patch速度稍慢;
+        如果增大oldWinSize或减小segSize, 补丁文件会更小, 但diff和patch速度会变慢。
+      oldWinSize: old data上最大的窗口字节数, 默认 -w-2m;
+        对大文件, 推荐 -w-4m-128k, -w-16m-256k 等。
+      segSize: 窗口匹配的初始数据粒度, 默认为 oldWinSize/64;
+        推荐 oldWinSize/128 <= segSize <= oldWinSize/4。
+  -WD[-stepSize]                (需要 v5.0 版本 patcher)
+      创建窗口diff格式(HDIFFW26), 优化patch时old data读取访问;
+      推荐作为主要的diff格式; patch时支持边下载边patch! 并支持多线程patch!
+      需要窗口模式diff, 如果没有设置-w则自动启用;
+      默认压缩算法为zstd, 可以通过-c-no关闭压缩;
+      默认checksum为xxh128, 可以通过-C-no关闭checksum;
+      stepSize>=(1024*4), 默认 -WD-256k, 推荐128k,512k等。
   -BSD
       创建一个和bsdiff4兼容的补丁, 不支持参数为文件夹。
       也支持和-SD选项一起运行(不使用其stepSize), 从而创建单压缩流的补丁文件，
@@ -140,10 +145,11 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
       创建一个标准规范VCDIFF格式的补丁, 不支持参数为文件夹。
       默认输出补丁不带压缩, 格式和 $open-vcdiff ... 或 $xdelta3 -S -e -n ... 命令输出的补丁格式兼容；
       如果设置了压缩级别compressLevel, 那输出格式和 $xdelta3 -S lzma -e -n ...命令输出的补丁格式兼容；
-      压缩输出时补丁文件使用7zXZ(xz)算法压缩, compressLevel可以选择0到9, 默认级别7；
+      压缩输出时补丁文件使用7zXZ(xz,lzma)算法压缩, compressLevel可以选择0到9, 默认级别7；
       压缩字典大小dictSize可以设置为 4096, 4k, 4m, 16m等, 默认为8m
       支持多线程并行压缩。
-      注意: 输出的补丁的格式中可能使用了巨大的源窗口大小!
+      注意: 默认的 diffFile 输出使用了较大的源窗口大小！
+        需要使用 -w[-oldWinSize-segSize-newWinSize] 来设置 源/分段/目标窗口大小。
   -p-parallelThreadNumber
       设置线程数parallelThreadNumber>1时,开启多线程并行模式;
       默认为4;需要占用较多的内存。
@@ -154,8 +160,10 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
         线程搜索模式或者降低搜索线程数searchThreadNumber的值!
   -c-compressType[-compressLevel]
       设置补丁数据使用的压缩算法和压缩级别等, 默认不压缩;
+      开启 -WD 格式时，默认开启了 zstd 压缩算法;
       补丁另存时,使用新的压缩参数设置来输出新补丁;
       支持的压缩算法、压缩级别和字典大小等:
+        -c-no                           关闭压缩
         -c-zlib[-{1..9}[-dictBits]]     默认级别 9
             压缩字典比特数dictBits可以为9到15, 默认为15。
             支持多线程并行压缩,很快！
@@ -181,7 +189,7 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
       支持的校验选项:
         -C-no                   不校验
         -C-crc32
-        -C-fadler64             默认
+        -C-fadler64
         -C-md5
         -C-xxh3                 (需要 v4.12版本 patch端)
         -C-xxh128               推荐 (需要 v4.12版本 patch端)
@@ -259,19 +267,17 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
         那需要的内存大小: (源窗口大小+目标窗口大小 + 3*解压缩缓冲区);
   -p-parallelThreadNumber
       设置线程数 parallelThreadNumber>1 时,开启多线程并行模式;
-      当前只支持单压缩流的补丁文件(用hdiffz -SD-stepSize所创建);
+      当前支持单压缩流补丁文件(用hdiffz -SD-stepSize创建)和window diff格式补丁文件(用hdiffz -WD所创建);
       可以设置值 1..5, 默认 -p-1 (即单线程)!
   -C-checksumSets
-      为文件夹patch设置校验方式, 默认设置为 -C-new-copy;
+      为窗口补丁、文件夹补丁、VCDIFF补丁设置校验方式, 默认设置为 -C-new;
       校验设置支持(可以多选):
-        -C-diff         校验补丁数据;
-        -C-old          校验引用到的旧版本的文件;
-        -C-new          校验有修改过的新版本的文件;
-        -C-copy         校验从旧版本直接copy到新版本的文件;
         -C-no           不执行校验;
-        -C-all          等价于: -C-diff-old-new-copy;
-  -C-no 或 -C-new
-      如果diffFile是VCDIFF格式补丁文件, 使用该选项可以关闭或打开校验，默认打开.
+        -C-new          校验有修改过的新版本的文件;
+        -C-diff         校验补丁数据; (VCDIFF不支持)
+        -C-old          校验引用到的旧版本的文件; (VCDIFF不支持)
+        -C-copy         校验从旧版本直接copy到新版本的文件; (仅文件夹patch)
+        -C-all          等价于: -C-new-copy-diff-old;
   -n-maxOpenFileNumber
       为文件夹间的-s模式patch设置最大允许同时打开的文件数;
       maxOpenFileNumber>=8, 默认为24; 合适的限制值可能不同系统下不同。
@@ -305,7 +311,7 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
 * **patch()**
 * **patch_stream()**
 * **patch_stream_with_cache()**
-### v2 API, 压缩的补丁包:
+### v2 API, 压缩的补丁包 (HDIFF13):
 * **create_compressed_diff()**
 * **create_compressed_diff_stream()**
 * **resave_compressed_diff()**
@@ -315,7 +321,7 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
 ### v3 API, 在文件夹间 **diff**&**patch**:
 * **dir_diff()**
 * **TDirPatcher_\*()** functions with **struct TDirPatcher**
-### v4 API, 单压缩流补丁包:
+### v4 API, 单压缩流补丁包 (HDIFFSF20):
 * **create_single_compressed_diff()**
 * **create_single_compressed_diff_stream()**
 * **resave_single_compressed_diff()**
@@ -323,6 +329,10 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
 * **patch_single_stream_mem()**
 * **patch_single_compressed_diff()**
 * **patch_single_stream_diff()**
+### v5 API, 窗口补丁包 (HDIFFW26):
+* **create_window_diff()**
+* **patch_window_diff()**
+* **resave_window_diff()**
 #### hpatch lite API,  为 MCU,NB-IoT... 优化了的 hpatch (例子 [HPatchLite]): 
 * **create_lite_diff()**
 * **hpatch_lite_open()**
@@ -399,9 +409,9 @@ $ git clone https://github.com/sisong/bzip2.git  ../bzip2
 **hdiffz zlib** diff with `-m-6 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
 **hdiffz lzma2** diff with `-m-6 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
 **hdiffz zstd** diff with `-m-6 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
-**hdiffz -s zlib** diff with `-s-64 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
-**hdiffz -s lzma2** diff with `-s-64 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
-**hdiffz -s zstd** diff with `-s-64 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz s zlib** diff with `-s-64 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
+**hdiffz s lzma2** diff with `-s-64 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz s zstd** diff with `-s-64 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
 & adding all **hdiffz**  test with -p-8   
 **hpatchz** patch with `-s-3m -f {old} {pat} {new}`    
 **hsynz** test, make sync info by `hsync_make -s-2k {new} {out_newi} {out_newz}`,    
@@ -410,6 +420,25 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
 **hsynz p8 zlib** run hsync_make with `-p-8 -c-zlib-9` (run `hsync_demo` with `-p-8`)   
 **hsynz p1 zstd** run hsync_make with `-p-1 -c-zstd-21-24`   
 **hsynz p8 zstd** run hsync_make with `-p-8 -c-zstd-21-24` (run `hsync_demo` with `-p-8`)   
+   
+update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
+**hdiffz w p1 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+**hdiffz w p8 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+**hdiffz w p8 lzma2** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz w p8 zstd** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sw p8 lzma2** diff with `-s-64 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sw p8 zstd** diff with `-s-64 -SD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz WD p1 lzma2** diff with `-m-6 -WD -w-2m -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz WD p8 lzma2** diff with `-m-6 -WD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz WD p1 zstd** diff with `-m-6 -WD -w-2m -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz WD p8 zstd** diff with `-m-6 -WD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sWD p1 lzma2** diff with `-s-64 -WD -w-2m -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sWD p8 lzma2** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sWD p1 zstd** diff with `-s-64 -WD -w-2m -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sWD p8 zstd** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+ & **hpatchz** patch with `-s-8m -C-no -p-1 -f {old} {pat} {new}` when diff with `-WD -p-1`   
+ & **hpatchz** patch with `-s-8m -C-no -p-5 -f {old} {pat} {new}` when diff with `-WD -p-8`   
    
 **测试结果取平均**:
 |程序|包大小|diff内存|速度|patch内存|最大内存|速度|
@@ -421,31 +450,46 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
 ||
 |zstd --patch-from|7.96%|2798M|3.3MB/s|629M|2303M|828MB/s|
 |xdelta3|13.60%|409M|6.9MB/s|86M|102M|159MB/s|
-|xdelta3 +hpatchz -m|13.60%|409M|6.9MB/s|70M|82M|377MB/s|
+|xdelta3 +hpatchz|13.60%|409M|6.9MB/s|70M|82M|377MB/s|
 |xdelta3 -B|9.63%|2282M|10.9MB/s|460M|2070M|267MB/s|
-|xdelta3 -B +hpatchz -m|9.63%|2282M|10.9MB/s|315M|1100M|477MB/s|
+|xdelta3 -B +hpatchz|9.63%|2282M|10.9MB/s|315M|1100M|477MB/s|
+|hdiffz sw p1 -VCD|9.22%|329M|15.9MB/s|31M|33M|519MB/s|
+|hdiffz sw p8 -VCD|9.22%|506M|48.2MB/s|31M|33M|515MB/s|
 |bsdiff|8.17%|2773M|2.5MB/s|637M|2312M|167MB/s|
 |bsdiff +hpatchz -m|8.17%|2773M|2.5MB/s|321M|1101M|197MB/s|
 |hdiffz p1 -BSD|7.72%|1210M|13.4MB/s|14M|14M|172MB/s|
 |hdiffz p8 -BSD|7.72%|1191M|31.2MB/s|14M|14M|172MB/s|
+||
+|hsynz p1 zlib|20.05%|6M|17.3MB/s|6M|22M|273MB/s|
+|hsynz p8 zlib|20.05%|30M|115.1MB/s|13M|29M|435MB/s|
+|hsynz p1 zstd|14.96%|532M|1.9MB/s|24M|34M|264MB/s|
+|hsynz p8 zstd|14.95%|3349M|10.1MB/s|24M|34M|410MB/s|
+||
 |hdiffz p1 zlib|7.79%|1214M|14.4MB/s|4M|4M|564MB/s|
 |hdiffz p8 zlib|7.79%|1190M|44.8MB/s|4M|4M|559MB/s|
 |hdiffz p1 lzma2|6.44%|1209M|11.4MB/s|16M|20M|431MB/s|
 |hdiffz p8 lzma2|6.44%|1191M|33.4MB/s|16M|20M|428MB/s|
 |hdiffz p1 zstd|6.74%|1211M|11.5MB/s|16M|21M|592MB/s|
 |hdiffz p8 zstd|6.74%|1531M|24.3MB/s|16M|21M|586MB/s|
-|hdiffz -s p1 -BSD|11.96%|91M|46.0MB/s|14M|14M|148MB/s|
-|hdiffz -s p8 -BSD|11.96%|95M|59.8MB/s|14M|14M|148MB/s|
-|hdiffz -s p1 zlib|12.52%|91M|46.4MB/s|3M|4M|611MB/s|
-|hdiffz -s p8 zlib|12.53%|95M|178.9MB/s|3M|4M|609MB/s|
-|hdiffz -s p1 lzma2|9.11%|170M|18.1MB/s|17M|20M|402MB/s|
-|hdiffz -s p8 lzma2|9.13%|370M|50.6MB/s|17M|20M|400MB/s|
-|hdiffz -s p1 zstd|9.60%|195M|18.0MB/s|17M|21M|677MB/s|
-|hdiffz -s p8 zstd|9.60%|976M|28.5MB/s|17M|21M|678MB/s|
-|hsynz p1 zlib|20.05%|6M|17.3MB/s|6M|22M|273MB/s|
-|hsynz p8 zlib|20.05%|30M|115.1MB/s|13M|29M|435MB/s|
-|hsynz p1 zstd|14.96%|532M|1.9MB/s|24M|34M|264MB/s|
-|hsynz p8 zstd|14.95%|3349M|10.1MB/s|24M|34M|410MB/s|
+|hdiffz w p8 lzma2|6.49%|666M|24.3MB/s|20M|25M|730MB/s|
+|hdiffz w p8 zstd|6.78%|966M|19.2MB/s|20M|26M|1253MB/s|
+|hdiffz WD p1 lzma2|6.52%|679M|7.9MB/s|22M|27M|749MB/s|
+|hdiffz WD p8 lzma2|6.52%|666M|24.8MB/s|22M|27M|1020MB/s|
+|hdiffz WD p1 zstd|6.82%|678M|7.9MB/s|22M|28M|1548MB/s|
+|hdiffz WD p8 zstd|6.82%|971M|19.2MB/s|22M|28M|2527MB/s|
+||
+|hdiffz s p1 zlib|12.52%|91M|46.4MB/s|3M|4M|611MB/s|
+|hdiffz s p8 zlib|12.53%|95M|178.9MB/s|3M|4M|609MB/s|
+|hdiffz s p1 lzma2|9.11%|170M|18.1MB/s|17M|20M|402MB/s|
+|hdiffz s p8 lzma2|9.13%|370M|50.6MB/s|17M|20M|400MB/s|
+|hdiffz s p1 zstd|9.60%|195M|18.0MB/s|17M|21M|677MB/s|
+|hdiffz s p8 zstd|9.60%|976M|28.5MB/s|17M|21M|678MB/s|
+|hdiffz sw p8 lzma2|6.76%|253M|33.7MB/s|20M|25M|584MB/s|
+|hdiffz sw p8 zstd|7.07%|851M|24.9MB/s|20M|26M|873MB/s|
+|hdiffz sWD p1 lzma2|6.80%|177M|13.0MB/s|22M|27M|710MB/s|
+|hdiffz sWD p8 lzma2|6.80%|269M|39.6MB/s|22M|27M|988MB/s|
+|hdiffz sWD p1 zstd|7.12%|211M|13.2MB/s|21M|28M|1449MB/s|
+|hdiffz sWD p8 zstd|7.12%|869M|27.9MB/s|21M|28M|2326MB/s|
     
 
 ## 使用 Apk 文件来测试: 
@@ -500,18 +544,30 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
  sfpatcher patch with `-lp -p-8 {old} {pat} {new}`   
 adding test hpatchz&sfpatcher on Android, arm CPU 麒麟980(2×A76 2.6G + 2×A76 1.92G + 4×A55 1.8G)   
 ( [archive-patcher]、[sfpatcher] diff&patch 时针对apk文件格式进行了优化 )  
+   
+update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
 
 **测试结果取平均**:
 |程序|包大小|diff内存|速度|patch内存|最大内存|速度|arm 麒麟980|
 |:----|----:|----:|----:|----:|----:|----:|----:|
 |zstd --patch-from|53.18%|2199M|3.6MB/s|209M|596M|609MB/s|
 |xdelta3|54.51%|422M|3.8MB/s|98M|99M|170MB/s|
-|xdelta3 +hpatchz -m|54.51%|422M|3.8MB/s|70M|81M|438MB/s|
+|xdelta3 +hpatchz|54.51%|422M|3.8MB/s|70M|81M|438MB/s|
+|hdiffz sw p1 -VCD|53.73%|288M|9.0MB/s|33M|33M|317MB/s|
+|hdiffz sw p8 -VCD|53.73%|459M|26.2MB/s|33M|33M|318MB/s|
 |bsdiff|53.84%|931M|1.2MB/s|218M|605M|54MB/s|
-|bsdiff+hpatchz -m|53.84%|931M|1.2MB/s|116M|310M|57MB/s|
-|bsdiff+hpatchz -s|53.84%|931M|1.2MB/s|14M|14M|54MB/s|
+|bsdiff +hpatchz -m|53.84%|931M|1.2MB/s|116M|310M|57MB/s|
+|bsdiff +hpatchz -s|53.84%|931M|1.2MB/s|14M|14M|54MB/s|
 |hdiffz p1 -BSD|53.69%|509M|6.8MB/s|14M|14M|55MB/s|
 |hdiffz p8 -BSD|53.70%|514M|15.3MB/s|14M|14M|55MB/s|
+|hsynz p1|62.43%|4M|1533.5MB/s|4M|10M|236MB/s|
+|hsynz p8|62.43%|18M|2336.4MB/s|12M|18M|394MB/s|
+|hsynz p1 zlib|58.67%|5M|22.7MB/s|4M|11M|243MB/s|
+|hsynz p8 zlib|58.67%|29M|138.6MB/s|12M|19M|410MB/s|
+|hsynz p1 zstd|57.74%|534M|2.7MB/s|24M|28M|234MB/s|
+|hsynz p8 zstd|57.74%|3434M|13.4MB/s|24M|28M|390MB/s|
+||
 |hdiffz p1|54.40%|509M|8.8MB/s|5M|6M|682MB/s|
 |hdiffz p8|54.41%|514M|32.4MB/s|5M|6M|686MB/s|443MB/s|
 |hdiffz p1 zlib|53.21%|509M|8.2MB/s|5M|6M|514MB/s|
@@ -520,18 +576,25 @@ adding test hpatchz&sfpatcher on Android, arm CPU 麒麟980(2×A76 2.6G + 2×A76
 |hdiffz p8 lzma2|52.94%|557M|18.9MB/s|21M|22M|261MB/s|131MB/s|
 |hdiffz p1 zstd|53.04%|537M|5.4MB/s|21M|22M|598MB/s|
 |hdiffz p8 zstd|53.05%|1251M|11.1MB/s|21M|22M|604MB/s|371MB/s|
-|hdiffz -s p1 zlib|53.73%|118M|26.8MB/s|4M|6M|513MB/s|
-|hdiffz -s p8 zlib|53.73%|122M|97.3MB/s|4M|6M|513MB/s|
-|hdiffz -s p1 lzma2|53.30%|197M|6.4MB/s|20M|22M|258MB/s|
-|hdiffz -s p8 lzma2|53.30%|309M|32.4MB/s|20M|22M|258MB/s|
-|hdiffz -s p1 zstd|53.44%|221M|10.1MB/s|20M|22M|620MB/s|
-|hdiffz -s p8 zstd|53.44%|1048M|14.4MB/s|20M|22M|613MB/s|
-|hsynz p1|62.43%|4M|1533.5MB/s|4M|10M|236MB/s|
-|hsynz p8|62.43%|18M|2336.4MB/s|12M|18M|394MB/s|
-|hsynz p1 zlib|58.67%|5M|22.7MB/s|4M|11M|243MB/s|
-|hsynz p8 zlib|58.67%|29M|138.6MB/s|12M|19M|410MB/s|
-|hsynz p1 zstd|57.74%|534M|2.7MB/s|24M|28M|234MB/s|
-|hsynz p8 zstd|57.74%|3434M|13.4MB/s|24M|28M|390MB/s|
+|hdiffz w p8 lzma2|53.25%|389M|8.0MB/s|25M|25M|322MB/s|
+|hdiffz w p8 zstd|53.36%|1042M|6.3MB/s|24M|26M|1098MB/s|
+|hdiffz WD p1 lzma2|53.27%|374M|1.7MB/s|27M|27M|303MB/s|
+|hdiffz WD p8 lzma2|53.27%|390M|8.0MB/s|27M|27M|350MB/s|
+|hdiffz WD p1 zstd|53.38%|384M|1.9MB/s|25M|28M|1171MB/s|
+|hdiffz WD p8 zstd|53.38%|1045M|6.2MB/s|20M|28M|1768MB/s|
+|hdiffz s p1 zlib|53.73%|118M|26.8MB/s|4M|6M|513MB/s|
+|hdiffz s p8 zlib|53.73%|122M|97.3MB/s|4M|6M|513MB/s|
+|hdiffz s p1 lzma2|53.30%|197M|6.4MB/s|20M|22M|258MB/s|
+|hdiffz s p8 lzma2|53.30%|309M|32.4MB/s|20M|22M|258MB/s|
+|hdiffz s p1 zstd|53.44%|221M|10.1MB/s|20M|22M|620MB/s|
+|hdiffz s p8 zstd|53.44%|1048M|14.4MB/s|20M|22M|613MB/s|
+|hdiffz sw p8 lzma2|53.27%|299M|19.3MB/s|25M|25M|319MB/s|
+|hdiffz sw p8 zstd|53.38%|1042M|11.3MB/s|25M|26M|1068MB/s|
+|hdiffz sWD p1 lzma2|53.29%|196M|4.6MB/s|27M|27M|306MB/s|
+|hdiffz sWD p8 lzma2|53.29%|303M|19.8MB/s|27M|27M|350MB/s|
+|hdiffz sWD p1 zstd|53.41%|222M|6.3MB/s|25M|28M|1179MB/s|
+|hdiffz sWD p8 zstd|53.41%|1045M|11.5MB/s|20M|28M|1770MB/s|
+||
 |archive-patcher|31.65%|1448M|0.9MB/s|558M|587M|14MB/s|
 |sfpatcher-1 p1 zstd|31.08%|818M|2.3MB/s|15M|19M|201MB/s|92MB/s|
 |sfpatcher-1 p8 zstd|31.07%|1025M|4.6MB/s|18M|25M|424MB/s|189MB/s|

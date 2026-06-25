@@ -30,12 +30,10 @@ MINS     := 0
 VCD      := 1
 # need support bsdiff&bspatch?
 BSD      := 1
+# 0: not need bzip2 (must BSD=0);  1: compile bzip2 source code;  2: used -lbz2 to link bzip2 lib;
+BZIP2    := 1
 ifeq ($(OS),Windows_NT) # mingw?
   CC    := gcc
-  BZIP2 := 1
-else
-  # 0: not need bzip2 (must BSD=0);  1: compile bzip2 source code;  2: used -lbz2 to link bzip2 lib;
-  BZIP2 := 2
 endif
 ifeq ($(BSD),0)
 else
@@ -65,11 +63,13 @@ ATOMIC_U64 := 1
 HDIFF_OBJ  := 
 HPATCH_OBJ := \
     libHDiffPatch/HPatch/patch.o \
+    libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.o \
     file_for_patch.o
 
 ifeq ($(MT),0)
 else
   HPATCH_OBJ+=libHDiffPatch/HPatch/hpatch_mt/_hcache_old_mt.o \
+              libHDiffPatch/HPatch/hpatch_mt/_hcache_window_old_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_hinput_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_houtput_mt.o \
               libHDiffPatch/HPatch/hpatch_mt/_hpatch_mt.o \
@@ -85,8 +85,7 @@ else
     dirDiffPatch/dir_patch/ref_stream.o \
     dirDiffPatch/dir_patch/new_stream.o \
     dirDiffPatch/dir_patch/dir_patch_tools.o \
-    dirDiffPatch/dir_patch/new_dir_output.o \
-    libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.o
+    dirDiffPatch/dir_patch/new_dir_output.o
 endif
 
 ifeq ($(BSD),0)
@@ -222,7 +221,7 @@ HDIFF_OBJ += \
     hdiffz_import_patch.o \
     libHDiffPatch/HPatchLite/hpatch_lite.o \
     libHDiffPatch/HDiff/diff.o \
-    libHDiffPatch/HDiff/match_block.o \
+    libHDiffPatch/HDiff/private_diff/match_block.o \
     libHDiffPatch/HDiff/private_diff/bytes_rle.o \
     libHDiffPatch/HDiff/private_diff/suffix_string.o \
     libHDiffPatch/HDiff/private_diff/compress_detect.o \
@@ -230,11 +229,10 @@ HDIFF_OBJ += \
     libHDiffPatch/HDiff/private_diff/limit_mem_diff/stream_serialize.o \
     libHDiffPatch/HDiff/private_diff/libdivsufsort/divsufsort64.o \
     libHDiffPatch/HDiff/private_diff/libdivsufsort/divsufsort.o \
+    libHDiffPatch/HDiff/private_diff/window_diff/window_matcher.o \
+    libHDiffPatch/HDiff/private_diff/window_diff/covers_range.o \
     dirDiffPatch/dir_diff/dir_diff_tools.o \
     $(HPATCH_OBJ)
-ifeq ($(DIR_DIFF),0)
-  HDIFF_OBJ += libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.o
-endif
 
 ifeq ($(DIR_DIFF),0)
 else

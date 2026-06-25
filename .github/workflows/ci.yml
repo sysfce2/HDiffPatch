@@ -1,6 +1,7 @@
 name: ci
 on: [push, pull_request]
 jobs:
+
   gcc-build:
     strategy:
       matrix:
@@ -25,9 +26,9 @@ jobs:
           git clone --depth=1 https://github.com/sisong/bzip2.git ../bzip2
           git clone --depth=1 https://github.com/sisong/zlib.git ../zlib
           git clone --depth=1 https://github.com/sisong/libdeflate.git ../libdeflate
-          make CC=gcc CXX=g++ BZIP2=1 -j
+          make CC=gcc CXX=g++ -j
           ./unit_test
-          make BZIP2=1 clean
+          make clean
 
   clang-build:
     strategy:
@@ -49,9 +50,9 @@ jobs:
           git clone --depth=1 https://github.com/sisong/bzip2.git ../bzip2
           git clone --depth=1 https://github.com/sisong/zlib.git ../zlib
           git clone --depth=1 https://github.com/sisong/libdeflate.git ../libdeflate
-          make CL=1 BZIP2=1 -j
+          make CL=1 -j
           ./unit_test
-          make CL=1 BZIP2=1 clean
+          make CL=1 clean
 
   xcode-build:
     runs-on: macos-latest
@@ -80,6 +81,8 @@ jobs:
           ndk-version: r23c
       - name: buildByAndroidNDK
         run: |
+          git clone --depth=1 https://github.com/sisong/libmd5.git ../libmd5
+          git clone --depth=1 https://github.com/sisong/xxHash.git ../xxHash
           git clone --depth=1 https://github.com/sisong/lzma.git ../lzma
           git clone --depth=1 https://github.com/sisong/zstd.git ../zstd
           cd ./builds/android_ndk_jni_mk
@@ -94,11 +97,13 @@ jobs:
           ndk-version: r23c
       - name: buildByAndroidNDK
         run: |
+          git clone --depth=1 https://github.com/sisong/libmd5.git ../libmd5
+          git clone --depth=1 https://github.com/sisong/xxHash.git ../xxHash
           git clone --depth=1 https://github.com/sisong/lzma.git ../lzma
           git clone --depth=1 https://github.com/sisong/zstd.git ../zstd
           git clone --depth=1 https://github.com/sisong/bzip2.git ../bzip2
           cd ./builds/android_ndk_jni_mk
-          ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=./Application.mk BSD=1 BZIP2=1
+          ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=./Application.mk BSD=1 BZIP2=1 MT=0
 
   ubuntu-ndk-build:
     runs-on: ubuntu-latest
@@ -113,17 +118,19 @@ jobs:
           sudo dpkg -i libtinfo5_6.4-2_amd64.deb
           curl -O http://launchpadlibrarian.net/648013227/libncurses5_6.4-2_amd64.deb
           sudo dpkg -i libncurses5_6.4-2_amd64.deb
+          git clone --depth=1 https://github.com/sisong/libmd5.git ../libmd5
+          git clone --depth=1 https://github.com/sisong/xxHash.git ../xxHash
           git clone --depth=1 https://github.com/sisong/lzma.git ../lzma
-          git clone --depth=1 https://github.com/sisong/bzip2.git ../bzip2
           git clone --depth=1 https://github.com/sisong/zstd.git ../zstd
+          git clone --depth=1 https://github.com/sisong/bzip2.git ../bzip2
           cd ./builds/android_ndk_jni_mk
-          ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=./Application.mk BSD=1 BZIP2=1 VCD=1
+          ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=./Application.mk BSD=1 BZIP2=1 VCD=1 DIR=1
 
   vc-build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: microsoft/setup-msbuild@v2
+      - uses: microsoft/setup-msbuild@v3
         with:
           msbuild-architecture: x64
       - name: initAndClone
@@ -137,4 +144,6 @@ jobs:
           git clone --depth=1 https://github.com/sisong/libdeflate.git ../libdeflate
       - name: buildByVC
         run: |
-          msbuild builds/vc/HDiffPatch.sln -t:rebuild -verbosity:diag -property:Configuration=Release
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -v:q -property:Platform=x64 -property:Configuration=Release /p:PlatformToolset=v145
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -v:q -property:Platform=x86 -property:Configuration=Release /p:PlatformToolset=v145
+          msbuild builds/vc/HDiffPatch.sln -t:rebuild -v:q -property:Platform=ARM64 -property:Configuration=Release /p:PlatformToolset=v145

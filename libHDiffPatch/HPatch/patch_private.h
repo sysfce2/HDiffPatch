@@ -238,6 +238,58 @@ hpatch_BOOL _patch_step_cache_old(const hpatch_TStreamInput** poldData,hpatch_St
                                   size_t kMinTempCacheSize,hpatch_byte** ptemp_cache,hpatch_byte** ptemp_cache_end);
 hpatch_BOOL _patch_step_cache_old_onStepCovers(const hpatch_TStreamInput* self,const unsigned char* covers_cache,const unsigned char* covers_cacheEnd);
 #endif // _IS_NEED_CACHE_OLD_BY_COVERS
+hpatch_size_t _patch_is_can_cache_window_old_canUsedSize(hpatch_size_t windowOldBufSize,hpatch_size_t stepCoversMemSize,
+                                                         hpatch_size_t kMinTempCacheSize,hpatch_size_t tempCacheSize,hpatch_StreamPos_t oldDataSize);
+
+// ---- window overlap computation (shared by ST and MT) ----
+
+    typedef struct _oldwin_info_t{
+        hpatch_StreamPos_t oldPos;
+        hpatch_StreamPos_t len;
+    } _oldwin_info_t;
+
+typedef enum {
+    _kOverlapType_none = 0,       // no overlap (or no reuse)
+    _kOverlapType_contained,     // curr window fully contained in prev window
+    _kOverlapType_rightTail,     // curr starts inside prev, extends past prev end (tail overlap)
+    _kOverlapType_leftHead,      // curr starts before prev, ends inside prev (head overlap)
+    _kOverlapType_superset       // curr fully contains prev
+} _kOverlapType_t;
+
+static hpatch_inline _kOverlapType_t _compute_window_overlap(hpatch_StreamPos_t prevOldPos, hpatch_StreamPos_t prevOldEnd,
+                            hpatch_StreamPos_t currOldPos, hpatch_StreamPos_t currOldEnd,hpatch_StreamPos_t* out_reuseLen,
+                            hpatch_StreamPos_t* out_reuseOff,hpatch_StreamPos_t* out_noOverlapLeft){
+    hpatch_StreamPos_t oStart=(prevOldPos>currOldPos)?prevOldPos:currOldPos;
+    hpatch_StreamPos_t oEnd=(prevOldEnd<currOldEnd)?prevOldEnd:currOldEnd;
+    assert((prevOldPos<=prevOldEnd)&&(currOldPos<=currOldEnd));
+    if (oStart>=oEnd){
+        *out_reuseLen=0;
+        *out_reuseOff=0; // no value
+        *out_noOverlapLeft=0; // no value
+        return _kOverlapType_none; // no overlap
+    }else if ((currOldPos>=prevOldPos)&&(currOldEnd<=prevOldEnd)){// curr include prev (fully contained)
+        *out_reuseLen=currOldEnd-currOldPos;
+        *out_reuseOff=currOldPos-prevOldPos;
+        *out_noOverlapLeft=0;
+        return _kOverlapType_contained;
+    }else if ((currOldPos>=prevOldPos)&&(currOldPos<prevOldEnd)){// right-side/tail overlap
+        *out_reuseLen=prevOldEnd-currOldPos;
+        *out_reuseOff=currOldPos-prevOldPos;
+        *out_noOverlapLeft=0;
+        return _kOverlapType_rightTail;
+    }else if ((currOldEnd>prevOldPos)&&(currOldEnd<=prevOldEnd)){// left-side/head overlap
+        *out_reuseLen=currOldEnd-prevOldPos;
+        *out_reuseOff=0;
+        *out_noOverlapLeft=prevOldPos-currOldPos;
+        return _kOverlapType_leftHead;
+    }else{// curr contains prev (superset)
+        assert((currOldPos<prevOldPos)&&(currOldEnd>prevOldEnd));
+        *out_reuseLen=prevOldEnd-prevOldPos;
+        *out_reuseOff=0;
+        *out_noOverlapLeft=prevOldPos-currOldPos;
+        return _kOverlapType_superset;
+    }
+}
 
 #ifdef __cplusplus
 }

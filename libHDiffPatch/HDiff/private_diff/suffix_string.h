@@ -91,7 +91,7 @@ public:
     inline size_t SASize()const{ return (size_t)(m_src_end-m_src_begin); }
     void clear();
 
-    inline TInt SA(TInt i)const{//return m_SA[i];// Sorted suffix string array.
+    hpatch_force_inline TInt SA(TInt i)const{//return m_SA[i];// Sorted suffix string array.
         if (isUseLargeSA())
             return m_SA_large[i];
         else
@@ -106,9 +106,11 @@ private:
     const TChar*        m_src_end;
     std::vector<TInt32> m_SA_limit;
     std::vector<TInt>   m_SA_large;
+    bool                m_isUseLargeSA;
     enum{ kLimitSASize= (1<<30)-1 + (1<<30) };//2G-1
-    inline bool isUseLargeSA()const{
-        return (sizeof(TInt)>sizeof(TInt32)) && (SASize()>kLimitSASize);
+    hpatch_force_inline bool isUseLargeSA()const{ return m_isUseLargeSA; }
+    static inline bool _isNeedUseLargeSA(size_t _SASize){
+        return (sizeof(TInt)>sizeof(TInt32)) && (_SASize>kLimitSASize);
     }
 private:
     // all cache for lower_bound speed

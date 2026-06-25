@@ -30,13 +30,13 @@
 #define DirPatch_dir_patch_h
 #include "dir_patch_types.h"
 #include "../../libHDiffPatch/HPatch/checksum_plugin.h"
-    typedef struct TDirPatchChecksumSet{
+    typedef struct TPatchChecksumSet{
         hpatch_TChecksum*   checksumPlugin;
         hpatch_BOOL         isCheck_oldRefData;
         hpatch_BOOL         isCheck_newRefData;  
         hpatch_BOOL         isCheck_copyFileData;
-        hpatch_BOOL         isCheck_dirDiffData;
-    } TDirPatchChecksumSet;
+        hpatch_BOOL         isCheck_diffData;
+    } TPatchChecksumSet;
 
 #if (_IS_NEED_DIR_DIFF_PATCH)
 #include "ref_stream.h"
@@ -57,6 +57,10 @@ typedef struct TDirDiffInfo{
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
     hpatch_BOOL         isSingleCompressedDiff;
     hpatch_singleCompressedDiffInfo sdiffInfo;
+#endif
+#if (_IS_NEED_WINDOW_DIFF)
+    hpatch_BOOL         isWindowDiff;
+    hpatch_windowDiffInfo       winDiffInfo;
 #endif
     hpatch_StreamPos_t          externDataOffset;
     hpatch_StreamPos_t          externDataSize;
@@ -121,7 +125,7 @@ typedef struct TDirPatcher{
     
     hpatch_ICopyDataListener    _sameFileCopyListener;
     
-    TDirPatchChecksumSet        _checksumSet;
+    TPatchChecksumSet           _checksumSet;
     unsigned char*              _pChecksumMem;
     
     hpatch_TDecompress*         _decompressPlugin;
@@ -135,8 +139,8 @@ hpatch_inline
 static void TDirPatcher_init(TDirPatcher* self)  { memset(self,0,sizeof(*self)); }
 hpatch_BOOL TDirPatcher_open(TDirPatcher* self,const hpatch_TStreamInput* dirDiffData,
                              const TDirDiffInfo** out_dirDiffInfo);
-//if checksumSet->isCheck_dirDiffData then result&=checksum(dirDiffData);
-hpatch_BOOL TDirPatcher_checksum(TDirPatcher* self,const TDirPatchChecksumSet* checksumSet,
+//if checksumSet->isCheck_diffData then result&=checksum(dirDiffData);
+hpatch_BOOL TDirPatcher_checksum(TDirPatcher* self,const TPatchChecksumSet* checksumSet,
 			                	 hpatch_byte* tempBuf,hpatch_byte* tempBufEnd);
 hpatch_BOOL TDirPatcher_loadDirData(TDirPatcher* self,hpatch_TDecompress* decompressPlugin,
                                     const char* oldPath_utf8,const char* newPath_utf8);

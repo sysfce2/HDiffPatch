@@ -27,7 +27,7 @@
  */
 #include "vcdiff_wrapper.h"
 #include "vcpatch_code_table.h"
-#include "../libHDiffPatch/HDiff/match_block.h"
+#include "../libHDiffPatch/HDiff/private_diff/match_block.h"
 #include "../libHDiffPatch/HDiff/private_diff/mem_buf.h"
 #include "../libHDiffPatch/HDiff/private_diff/limit_mem_diff/stream_serialize.h"
 #include "../libHDiffPatch/HPatch/patch.h"
@@ -70,7 +70,7 @@ static size_t fixRedundentEncoding(std::vector<hpatch_byte>& buf,hpatch_StreamPo
     return retSize;
 }
 
-static void _getSrcWindow(const TCovers& covers,size_t coveri,size_t coveriEnd,
+static void _getSrcWindow(const TInputCovers& covers,size_t coveri,size_t coveriEnd,
                           hpatch_StreamPos_t* out_srcPos,hpatch_StreamPos_t* out_srcEnd){
     if (coveri==coveriEnd){
         *out_srcPos=0;
@@ -80,7 +80,7 @@ static void _getSrcWindow(const TCovers& covers,size_t coveri,size_t coveriEnd,
     hpatch_StreamPos_t srcPos=~(hpatch_StreamPos_t)0;
     hpatch_StreamPos_t srcEnd=0;
     for (size_t i=coveri;i<coveriEnd;++i){
-        TCover c; covers.covers(i,&c);
+        const TCover& c=covers[i];
         hpatch_StreamPos_t pos=c.oldPos;
         srcPos=(pos<srcPos)?pos:srcPos;
         pos+=c.length;
@@ -91,14 +91,14 @@ static void _getSrcWindow(const TCovers& covers,size_t coveri,size_t coveriEnd,
 }
 
 static hpatch_StreamPos_t _getTargetWindow(hpatch_StreamPos_t targetPos,hpatch_StreamPos_t targetPosEnd,
-                                           const TCovers& covers,size_t coveri,size_t* coveriEnd,size_t kMaxTargetWindowsSize){
+                                           const TInputCovers& covers,size_t coveri,size_t* coveriEnd,size_t kMaxTargetWindowsSize){
     hpatch_StreamPos_t targetLen=0;
-    const size_t count=covers.coverCount();
+    const size_t count=covers.size();
     *coveriEnd=coveri;
     for (size_t i=coveri;i<=count;++i){
         TCover c; 
         if (i<count){
-            covers.covers(i,&c);
+            c=covers[i];
         }else{
             c.oldPos=hpatch_kNullStreamPos;
             c.newPos=targetPosEnd;
@@ -171,16 +171,16 @@ struct vc_encoder{
         memset(_self_hear_near_array,0,sizeof(_self_hear_near_array));
     }
     
-    void encode(const TCovers& covers,size_t coveri,
+    void encode(const TInputCovers& covers,size_t coveri,
                 hpatch_StreamPos_t targetPos,hpatch_StreamPos_t targetLen,
                 hpatch_StreamPos_t srcWindowPos,hpatch_StreamPos_t srcWindowLen){
-        size_t count=covers.coverCount();
+        size_t count=covers.size();
         const hpatch_StreamPos_t targetEnd=targetPos+targetLen;
         here=targetPos;
         for (size_t i=coveri;i<=count;++i){
             TCover c;
             if (i<count){
-                covers.covers(i,&c);
+                c=covers[i];
             }else{
                 c.oldPos=hpatch_kNullStreamPos;
                 c.newPos=targetPos+targetLen;
@@ -371,9 +371,80 @@ static bool compressVcDiffData(std::vector<hpatch_byte>& out_code,TVcCompress* c
 
 
 
-static void serialize_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                             const TCovers& covers,const hpatch_TStreamOutput* out_diff,
-                             const vcdiff_TCompress* compressPlugin,size_t kMaxTargetWindowsSize){
+static void _writeVcdiffWindowHeader(TDiffStream& outDiff,std::vector<hpatch_byte>& buf,
+                                     hpatch_StreamPos_t srcPos,hpatch_StreamPos_t srcEnd){
+    if (srcPos<srcEnd){
+        buf.push_back(VCD_SOURCE); //Win_Indicator
+        packUInt(buf,(hpatch_StreamPos_t)(srcEnd-srcPos));
+        packUInt(buf,srcPos);//srcPos
+    }else{
+        buf.push_back(0); //Win_Indicator, no src window
+    }
+    _flushBuf(outDiff,buf);
+}
+
+static void _writeVcdiffWindowDelta(TDiffStream& outDiff,std::vector<hpatch_byte>& buf,
+                                    const TInputCovers& covers,size_t coveriStart,
+                                    const hpatch_TStreamInput* newData,
+                                    hpatch_StreamPos_t targetPos,hpatch_StreamPos_t targetLen,
+                                    hpatch_StreamPos_t srcPos,hpatch_StreamPos_t srcLen,
+                                    const vcdiff_TCompress* compressPlugin,
+                                    std::vector<hpatch_byte>& inst,std::vector<hpatch_byte>& addr,
+                                    std::vector<hpatch_byte>& addr_z,TVcCompress* compressList){
+    {
+        vc_encoder encoder(inst,addr);
+        encoder.encode(covers,coveriStart,targetPos,targetLen,srcPos,srcLen);
+    }
+
+    TNewDataDiffStream _newDataDiff(covers,newData,coveriStart,targetPos,targetPos+targetLen);
+    if (compressPlugin==0){
+        hpatch_StreamPos_t deltaLen = hpatch_packUInt_size(targetLen)+1+hpatch_packUInt_size(_newDataDiff.streamSize)
+                                     +hpatch_packUInt_size(inst.size())+hpatch_packUInt_size(addr.size())
+                                     +_newDataDiff.streamSize+inst.size()+addr.size();
+        packUInt(buf,deltaLen);
+        packUInt(buf,targetLen);
+        buf.push_back(0); //Delta_Indicator
+        packUInt(buf,_newDataDiff.streamSize);
+        packUInt(buf,inst.size());
+        packUInt(buf,addr.size());
+        _flushBuf(outDiff,buf);
+
+        outDiff.pushStream(&_newDataDiff);
+        outDiff.pushBack(inst.data(),inst.size());
+        outDiff.pushBack(addr.data(),addr.size());
+    }else{
+        hpatch_TStreamInput _instStream;
+        hpatch_TStreamInput _addrStream;
+        mem_as_hStreamInput(&_instStream,inst.data(),inst.data()+inst.size());
+        mem_as_hStreamInput(&_addrStream,addr.data(),addr.data()+addr.size());
+
+        bool addr_is_z=compressVcDiffData(addr_z,&compressList[0],&_addrStream);
+        std::vector<hpatch_byte>& inst_z=addr;
+        bool inst_is_z=compressVcDiffData(inst_z,&compressList[1],&_instStream);
+        std::vector<hpatch_byte>& data_z=inst;
+        bool data_is_z=compressVcDiffData(data_z,&compressList[2],&_newDataDiff);
+        hpatch_byte Delta_Indicator=((data_is_z?1:0)<<0)|((inst_is_z?1:0)<<1)|((addr_is_z?1:0)<<2);
+        hpatch_StreamPos_t deltaLen = hpatch_packUInt_size(targetLen)+1+hpatch_packUInt_size(data_z.size())
+                                     +hpatch_packUInt_size(inst_z.size())+hpatch_packUInt_size(addr_z.size())
+                                     +(hpatch_StreamPos_t)data_z.size()+inst_z.size()+addr_z.size();
+        packUInt(buf,deltaLen);
+        packUInt(buf,targetLen);
+        buf.push_back(Delta_Indicator);
+        packUInt(buf,data_z.size());
+        packUInt(buf,inst_z.size());
+        packUInt(buf,addr_z.size());
+        _flushBuf(outDiff,buf);
+
+        outDiff.pushBack(data_z.data(),data_z.size());
+        outDiff.pushBack(inst_z.data(),inst_z.size());
+        outDiff.pushBack(addr_z.data(),addr_z.size());
+    }
+}
+
+static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                     const TInputCovers& covers,const std::vector<hpatch_TWindow>& matchWindows,
+                                     const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
+                                     size_t kMaxTargetWindowsSize,size_t kMaxSrcWindowsSize=~(size_t)0){
     _out_diff_info("  serialize VCDIFF diffData ...\n");
     std::vector<hpatch_byte> buf;
     TDiffStream outDiff(out_diff);
@@ -389,92 +460,119 @@ static void serialize_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TSt
         buf.push_back(Hdr_Indicator); 
         if (isHaveCompresser)//VCD_DECOMPRESS
             buf.push_back(compressPlugin->compress_type);
-        { //VCD_APPHEADER   // always add HDiffzAppHead tag to out_diff
+        { //VCD_APPHEADER   // add HDiffzAppHead tag to out_diff
             const std::string HDiffzAppHead=getHDiffzAppHead(compressPlugin);
             packUInt(buf,HDiffzAppHead.size());
             pushCStr(buf,HDiffzAppHead.c_str());
         }
         _flushBuf(outDiff,buf);
     }
-    
-    const hpatch_StreamPos_t targetPosEnd=newData->streamSize;
+
+    const hpatch_StreamPos_t newDataSize=newData->streamSize;
     hpatch_StreamPos_t targetPos=0;
-    size_t             coveri=0;
+    size_t coveri=0;
+    size_t wi=0;
     std::vector<hpatch_byte> inst;
     std::vector<hpatch_byte> addr;
     std::vector<hpatch_byte> addr_z;
     TVcCompress compressList[3];
-    compressList[0].compressPlugin=compressPlugin; 
-    compressList[1].compressPlugin=compressPlugin; 
-    compressList[2].compressPlugin=compressPlugin;        
-    hpatch_StreamPos_t srcPos,srcEnd;
-    _getSrcWindow(covers,0,covers.coverCount(),&srcPos,&srcEnd);
-    while (targetPos<targetPosEnd){
-        size_t coveriEnd;
-        const hpatch_StreamPos_t targetLen=_getTargetWindow(targetPos,targetPosEnd,covers,coveri,&coveriEnd,kMaxTargetWindowsSize);
-        {//used same one lagre srcWindowSize
-            if (srcPos<srcEnd){
-                buf.push_back(VCD_SOURCE); //Win_Indicator
-                packUInt(buf,(hpatch_StreamPos_t)(srcEnd-srcPos));
-                packUInt(buf,srcPos);//srcPos
-            }else{
-                buf.push_back(0); //Win_Indicator, no src window
+    compressList[0].compressPlugin=compressPlugin;
+    compressList[1].compressPlugin=compressPlugin;
+    compressList[2].compressPlugin=compressPlugin;
+
+    while (targetPos<newDataSize){
+        hpatch_StreamPos_t nextMatchStart=(wi<matchWindows.size())?matchWindows[wi].newPos:newDataSize;
+        hpatch_StreamPos_t nextMatchEnd=(wi<matchWindows.size())?matchWindows[wi].newPos+matchWindows[wi].newLength:newDataSize;
+
+        //check gap before next matched region
+        hpatch_StreamPos_t gapLen=nextMatchStart-targetPos;
+        if (gapLen>0){
+            //can we merge this gap into the next matched window?
+            bool canMerge=(wi<matchWindows.size())&&(gapLen+matchWindows[wi].newLength<=kMaxTargetWindowsSize);
+            if (!canMerge){ //encode gap as ADD-only VCDiff window
+                hpatch_StreamPos_t addTargetLen=(gapLen>kMaxTargetWindowsSize)?kMaxTargetWindowsSize:gapLen;
+                _writeVcdiffWindowHeader(outDiff,buf,0,0);
+                _writeVcdiffWindowDelta(outDiff,buf,covers,coveri,newData,
+                                        targetPos,addTargetLen,0,0,
+                                        compressPlugin,inst,addr,addr_z,compressList);
+                targetPos+=addTargetLen;
+                continue;
             }
-            _flushBuf(outDiff,buf);
         }
-        {
-            vc_encoder encoder(inst,addr);
-            encoder.encode(covers,coveri,targetPos,targetLen,srcPos,srcEnd-srcPos);
-        }
-        
-        TNewDataDiffStream _newDataDiff(covers,newData,coveri,targetPos,targetPos+targetLen);
-        if (compressPlugin==0){
-            hpatch_StreamPos_t deltaLen = hpatch_packUInt_size(targetLen)+1+hpatch_packUInt_size(_newDataDiff.streamSize)
-                                         +hpatch_packUInt_size(inst.size())+hpatch_packUInt_size(addr.size())
-                                         +_newDataDiff.streamSize+inst.size()+addr.size();
-            packUInt(buf,deltaLen);
-            packUInt(buf,targetLen);
-            buf.push_back(0); //Delta_Indicator
-            packUInt(buf,_newDataDiff.streamSize);
-            packUInt(buf,inst.size());
-            packUInt(buf,addr.size());
-            _flushBuf(outDiff,buf);
 
-            outDiff.pushStream(&_newDataDiff);
-            outDiff.pushBack(inst.data(),inst.size());
-            outDiff.pushBack(addr.data(),addr.size());
+        //find covers belonging to matchWindows[wi]
+        size_t coveriStart=coveri;
+        while (coveri<covers.size()&&covers[coveri].newPos<nextMatchEnd){
+            assert(covers[coveri].newPos>=nextMatchStart);
+            ++coveri;
+        }
+        size_t coveriEnd=coveri;
+
+        //compute source window for this matched window
+        hpatch_StreamPos_t srcPos,srcEnd;
+        _getSrcWindow(covers,coveriStart,coveriEnd,&srcPos,&srcEnd);
+        assert((hpatch_StreamPos_t)(srcEnd-srcPos)<=kMaxSrcWindowsSize);
+
+        //compute targetLen: try to include gap after this window
+        hpatch_StreamPos_t baseLen=nextMatchEnd-targetPos;
+        hpatch_StreamPos_t nextNextStart=(wi+1<matchWindows.size())?matchWindows[wi+1].newPos:newDataSize;
+        hpatch_StreamPos_t totalPotential=nextNextStart-targetPos;
+        hpatch_StreamPos_t targetLen;
+        if (totalPotential<=kMaxTargetWindowsSize){
+            targetLen=totalPotential; //merge gaps before+after with window
+        }else if (baseLen<=kMaxTargetWindowsSize){
+            targetLen=baseLen; //merge gap before only, gap after handled next iteration
         }else{
-            hpatch_TStreamInput _instStream;
-            hpatch_TStreamInput _addrStream;
-            mem_as_hStreamInput(&_instStream,inst.data(),inst.data()+inst.size());
-            mem_as_hStreamInput(&_addrStream,addr.data(),addr.data()+addr.size());
-
-            bool addr_is_z=compressVcDiffData(addr_z,&compressList[0],&_addrStream);
-            std::vector<hpatch_byte>& inst_z=addr;
-            bool inst_is_z=compressVcDiffData(inst_z,&compressList[1],&_instStream);
-            std::vector<hpatch_byte>& data_z=inst;
-            bool data_is_z=compressVcDiffData(data_z,&compressList[2],&_newDataDiff);
-            hpatch_byte Delta_Indicator=((data_is_z?1:0)<<0)|((inst_is_z?1:0)<<1)|((addr_is_z?1:0)<<2);
-            hpatch_StreamPos_t deltaLen = hpatch_packUInt_size(targetLen)+1+hpatch_packUInt_size(data_z.size())
-                                         +hpatch_packUInt_size(inst_z.size())+hpatch_packUInt_size(addr_z.size())
-                                         +(hpatch_StreamPos_t)data_z.size()+inst_z.size()+addr_z.size();
-            packUInt(buf,deltaLen);
-            packUInt(buf,targetLen);
-            buf.push_back(Delta_Indicator);
-            packUInt(buf,data_z.size());
-            packUInt(buf,inst_z.size());
-            packUInt(buf,addr_z.size());
-            _flushBuf(outDiff,buf);
-
-            outDiff.pushBack(data_z.data(),data_z.size());
-            outDiff.pushBack(inst_z.data(),inst_z.size());
-            outDiff.pushBack(addr_z.data(),addr_z.size());
+            targetLen=kMaxTargetWindowsSize; //rare: window too large, split
         }
+
+        _writeVcdiffWindowHeader(outDiff,buf,srcPos,srcEnd);
+        _writeVcdiffWindowDelta(outDiff,buf,covers,coveriStart,newData,
+                                targetPos,targetLen,srcPos,srcEnd-srcPos,
+                                compressPlugin,inst,addr,addr_z,compressList);
+
         coveri=coveriEnd;
         targetPos+=targetLen;
-    } //window loop
-    assert(coveri==covers.coverCount());
-    assert(targetPos==targetPosEnd);
+        if ((targetPos>=nextMatchEnd)&&(wi<matchWindows.size()))
+            ++wi;
+    }
+
+    //handle remaining gap after all windows
+    while (targetPos<newDataSize){
+        hpatch_StreamPos_t addTargetLen=(newDataSize-targetPos>kMaxTargetWindowsSize)?kMaxTargetWindowsSize:newDataSize-targetPos;
+        _writeVcdiffWindowHeader(outDiff,buf,0,0);
+        _writeVcdiffWindowDelta(outDiff,buf,covers,coveri,newData,
+                                targetPos,addTargetLen,0,0,
+                                compressPlugin,inst,addr,addr_z,compressList);
+        targetPos+=addTargetLen;
+    }
+
+    assert(wi==matchWindows.size());
+    assert(coveri==covers.size());
+    assert(targetPos==newDataSize);
+}
+
+static void serialize_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                             const TInputCovers& covers,const hpatch_TStreamOutput* out_diff,
+                             const vcdiff_TCompress* compressPlugin,size_t kMaxTargetWindowsSize){
+    std::vector<hpatch_TWindow> matchWindows;
+    hpatch_StreamPos_t targetPos=0;
+    size_t coveri=0;
+    while (targetPos<newData->streamSize){
+        size_t coveriEnd;
+        const hpatch_StreamPos_t targetLen=_getTargetWindow(targetPos,newData->streamSize,
+                                                            covers,coveri,&coveriEnd,kMaxTargetWindowsSize);
+        hpatch_TWindow w;
+        w.newPos=targetPos;
+        w.newLength=targetLen;
+        w.oldPos=0; w.oldLength=0; //will got by _getSrcWindow
+        matchWindows.push_back(w);
+        coveri=coveriEnd;
+        targetPos+=targetLen;
+    }
+    assert(coveri==covers.size());
+    assert(targetPos==newData->streamSize);
+    serialize_vcdiff_windows(newData,oldData,covers,matchWindows,out_diff,compressPlugin,kMaxTargetWindowsSize);
 }
 
     template<class _TCover,class _TLen>
@@ -506,24 +604,17 @@ static void serialize_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TSt
 void _create_vcdiff(const hpatch_byte* newData,const hpatch_byte* cur_newData_end,const hpatch_byte* newData_end,
                     const hpatch_byte* oldData,const hpatch_byte* cur_oldData_end,const hpatch_byte* oldData_end,
                     const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                    int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                    ICoverLinesListener* listener,size_t threadNum){
-    std::vector<hpatch_TCover_sz> covers;
-    const bool isCanExtendCover=false;
+                    int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
+    std::vector<TCover> covers;
+    const bool isExtendCover=false;
     get_match_covers_by_sstring(newData,cur_newData_end,oldData,cur_oldData_end,covers,
-                                kMinSingleMatchScore,isUseBigCacheMatch,listener,
-                                threadNum,isCanExtendCover);
-    _clipCovers(covers,(size_t)vcdiff_kMaxTargetWindowsSize/2);
-    const TCovers _covers((void*)covers.data(),covers.size(),
-                          sizeof(*covers.data())==sizeof(hpatch_TCover32));
+                                kMinSingleMatchScore,isUseBigCacheMatch,threadNum,isExtendCover);
+    _clipCovers(covers,(hpatch_StreamPos_t)vcdiff_kMaxTargetWindowsSize/2);
     
-    hpatch_TStreamInput _newStream;  hpatch_TStreamInput* newStream=&_newStream;
-    hpatch_TStreamInput _oldStream;  hpatch_TStreamInput* oldStream=&_oldStream;
-    mem_as_hStreamInput(newStream,newData,newData_end);
-    mem_as_hStreamInput(oldStream,oldData,oldData_end);
-    if (listener&&listener->map_streams_befor_serialize)
-        listener->map_streams_befor_serialize(listener,(const hpatch_TStreamInput **)&newStream,(const hpatch_TStreamInput **)&oldStream);
-    serialize_vcdiff(newStream,oldStream,_covers,out_diff,compressPlugin,vcdiff_kMaxTargetWindowsSize);
+    hpatch_TStreamInput newStream,oldStream;
+    mem_as_hStreamInput(&newStream,newData,newData_end);
+    mem_as_hStreamInput(&oldStream,oldData,oldData_end);
+    serialize_vcdiff(&newStream,&oldStream,covers,out_diff,compressPlugin,vcdiff_kMaxTargetWindowsSize);
 }
 
 }//end namespace hdiff_private
@@ -533,16 +624,13 @@ using namespace hdiff_private;
 void create_vcdiff(const hpatch_byte* newData,const hpatch_byte* newData_end,
                    const hpatch_byte* oldData,const hpatch_byte* oldData_end,
                    const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                   int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                   ICoverLinesListener* coverLinesListener,size_t threadNum){
+                   int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
     _create_vcdiff(newData,newData_end,newData_end,oldData,oldData_end,oldData_end,
-                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,
-                   coverLinesListener,threadNum);
+                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,threadNum);
 }
 void create_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                    const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                   int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                   ICoverLinesListener* coverLinesListener,size_t threadNum){
+                   int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
     TAutoMem oldAndNewData;
     loadOldAndNewStream(oldAndNewData,oldData,newData);
     size_t old_size=oldData?(size_t)oldData->streamSize:0;
@@ -550,58 +638,67 @@ void create_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput*
     hpatch_byte* pNewData=pOldData+old_size;
     hpatch_byte* pNewDataEnd=pNewData+(size_t)newData->streamSize;
     _create_vcdiff(pNewData,pNewDataEnd,pNewDataEnd,pOldData,pOldData+old_size,pOldData+old_size,
-                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,
-                   coverLinesListener,threadNum);
+                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,threadNum);
 }
 
 void create_vcdiff_stream(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                           const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
                           size_t kMatchBlockSize,const hdiff_TMTSets_s* mtsets){
-    TCoversBuf covers(newData->streamSize,oldData->streamSize);
-    get_match_covers_by_block(newData,oldData,&covers,kMatchBlockSize,mtsets);
-    if (covers._isCover32)
-        _clipCovers(covers.m_covers_limit,(hpatch_uint32_t)vcdiff_kMaxTargetWindowsSize/2);
-    else
-        _clipCovers(covers.m_covers_larger,(hpatch_StreamPos_t)vcdiff_kMaxTargetWindowsSize/2);
-    covers.update();
+    std::vector<TCover> covers;
+    get_match_covers_by_stream(newData,oldData,covers,kMatchBlockSize,mtsets);
+    _clipCovers(covers,(hpatch_StreamPos_t)vcdiff_kMaxTargetWindowsSize/2);
     serialize_vcdiff(newData,oldData,covers,out_diff,compressPlugin,vcdiff_kMaxTargetWindowsSize);
+}
+
+
+void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
+                          size_t kNewWindowSize,size_t kOldWindowSize,size_t kSegSize,
+                          size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,
+                          int kMinSingleMatchScore,bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    std::vector<TCover> covers;
+    std::vector<hpatch_TWindow> windows;
+    const bool isExtendCover=false;
+    const bool isCollateMergeCover=false;
+    get_match_covers_and_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,
+                                isCollateMergeCover,covers,windows,
+                                kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
+                                isUseBigCacheMatch,mtsets,isExtendCover);
+    serialize_vcdiff_windows(newData,oldData,covers,windows,out_diff,compressPlugin,kNewWindowSize,kOldWindowSize);
 }
 
 
 void create_vcdiff_block(hpatch_byte* newData,hpatch_byte* newData_end,
                          hpatch_byte* oldData,hpatch_byte* oldData_end,
                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                         int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                         size_t matchBlockSize,size_t threadNum){
-    if (matchBlockSize==0){
-        _create_vcdiff(newData,newData_end,newData_end,oldData,oldData_end,oldData_end,
-                       out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,0,threadNum);
-        return;
-    }
-    TCoversOptimMem coversOp(newData,newData_end,oldData,oldData_end,matchBlockSize,threadNum);
-    _create_vcdiff(newData,coversOp.matchBlock->newData_end_cur,newData_end,
-                   oldData,coversOp.matchBlock->oldData_end_cur,oldData_end,
-                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,&coversOp,threadNum);   
+                         size_t fastMatchBlockSize,int kMinSingleMatchScore,
+                         bool isUseBigCacheMatch,size_t threadNum){
+    std::vector<TCover> covers;
+    const bool isExtendCover=false;
+    get_match_covers_by_stream_and_sstring(newData,newData_end,oldData,oldData_end,
+                                           covers,fastMatchBlockSize,kMinSingleMatchScore,
+                                           isUseBigCacheMatch,threadNum,isExtendCover);
+    _clipCovers(covers,(hpatch_StreamPos_t)vcdiff_kMaxTargetWindowsSize/2);
+
+    hdiff_TStreamInput newStream,oldStream;
+    mem_as_hStreamInput(&newStream,newData,newData_end);
+    mem_as_hStreamInput(&oldStream,oldData,oldData_end);
+    serialize_vcdiff(&newStream,&oldStream,covers,out_diff,compressPlugin,vcdiff_kMaxTargetWindowsSize);
 }
 void create_vcdiff_block(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                          const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                         int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t matchBlockSize,
-                         size_t threadNumForMem,size_t threadNumForStream){
-    if (matchBlockSize==0){
-        TAutoMem oldAndNewData;
-        loadOldAndNewStream(oldAndNewData,oldData,newData);
-        size_t old_size=oldData?(size_t)oldData->streamSize:0;
-        unsigned char* pOldData=oldAndNewData.data();
-        unsigned char* pNewData=pOldData+old_size;
-        _create_vcdiff(pNewData,pNewData+(size_t)newData->streamSize,pNewData+(size_t)newData->streamSize,
-                       pOldData,pOldData+old_size,pOldData+old_size,
-                       out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,0,threadNumForMem);  
-        return;
-    }
-    TCoversOptimStream coversOp(newData,oldData,matchBlockSize,threadNumForMem,threadNumForStream);
-    _create_vcdiff(coversOp.matchBlock->newData,coversOp.matchBlock->newData_end_cur,coversOp.matchBlock->newData_end_cur,
-                   coversOp.matchBlock->oldData,coversOp.matchBlock->oldData_end_cur,coversOp.matchBlock->oldData_end_cur,
-                   out_diff,compressPlugin,kMinSingleMatchScore,isUseBigCacheMatch,&coversOp,threadNumForMem); 
+                         size_t fastMatchBlockSize,int kMinSingleMatchScore,
+                         bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    TCachedNewOldStreams cacheStreams;
+    std::vector<TCover> covers;
+    const bool isExtendCover=false;
+    get_match_covers_by_stream_and_sstring(newData,oldData,covers,fastMatchBlockSize,
+                                           kMinSingleMatchScore,isUseBigCacheMatch,
+                                           mtsets,isExtendCover,&cacheStreams);
+    _clipCovers(covers,(hpatch_StreamPos_t)vcdiff_kMaxTargetWindowsSize/2);
+
+    serialize_vcdiff(cacheStreams.newStream,cacheStreams.oldStream,covers,out_diff,
+                     compressPlugin,vcdiff_kMaxTargetWindowsSize);
 }
 
 bool check_vcdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,

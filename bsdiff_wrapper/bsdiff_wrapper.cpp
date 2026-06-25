@@ -27,7 +27,7 @@
  */
 #include "bsdiff_wrapper.h"
 #include "bspatch_wrapper.h"
-#include "../libHDiffPatch/HDiff/match_block.h"
+#include "../libHDiffPatch/HDiff/private_diff/match_block.h"
 #include "../libHDiffPatch/HDiff/diff.h"
 #include "../libHDiffPatch/HDiff/private_diff/mem_buf.h"
 #include "../libHDiffPatch/HDiff/private_diff/limit_mem_diff/stream_serialize.h"
@@ -53,26 +53,25 @@ namespace hdiff_private{
     }
 
     struct TCtrlStream:public hpatch_TStreamInput{
-        explicit TCtrlStream(const TCovers& _covers)
+        explicit TCtrlStream(const TInputCovers& _covers)
         :curPos(0),curi(0),bufi(0),covers(_covers){
             streamImport=this;
             read=_read;
-            streamSize=(covers.coverCount()-1)*(hpatch_StreamPos_t)(3*8);
+            streamSize=(covers.size()-1)*(hpatch_StreamPos_t)(3*8);
             buf.reserve(hdiff_kFileIOBufBestSize);
         }
     private:
         hpatch_StreamPos_t curPos;
         size_t curi;
         size_t bufi;
-        const TCovers& covers;
+        const TInputCovers covers;
         std::vector<unsigned char> buf;
         void _updateBuf(){
             buf.clear();
             bufi=0;
-            while ((curi+1<covers.coverCount())&&((buf.size()+3*8)<=hdiff_kFileIOBufBestSize)){
-                TCover c,cnext;
-                covers.covers(curi++,&c);
-                covers.covers(curi,&cnext);
+            while ((curi+1<covers.size())&&((buf.size()+3*8)<=hdiff_kFileIOBufBestSize)){
+                const TCover& c=covers[curi++];
+                const TCover& cnext=covers[curi];
                 pushUInt64(buf,c.length);
                 pushUInt64(buf,(hpatch_uint64_t)cnext.newPos-(hpatch_uint64_t)(c.newPos+c.length));
                 pushSInt64(buf,(hpatch_uint64_t)cnext.oldPos-(hpatch_uint64_t)(c.oldPos+c.length));
@@ -106,7 +105,7 @@ namespace hdiff_private{
 
 
     struct TInterlaceStream:public hpatch_TStreamInput{
-        explicit TInterlaceStream(const TCovers& _covers,TCtrlStream& _ctrlStream,
+        explicit TInterlaceStream(const TInputCovers& _covers,TCtrlStream& _ctrlStream,
                                   TNewDataSubDiffStream& _subStream,TNewDataDiffStream& _diffStream)
         :curPos(0),curi(0),covers(_covers),
         curCtrlPos(0),curSubPos(0),curDiffPos(0),curCtrlLen(0),curSubLen(0),curDiffLen(0),
@@ -118,7 +117,7 @@ namespace hdiff_private{
     private:
         hpatch_StreamPos_t  curPos;
         size_t              curi;
-        const TCovers&      covers;
+        const TInputCovers covers;
         hpatch_StreamPos_t curCtrlPos;
         hpatch_StreamPos_t curSubPos;
         hpatch_StreamPos_t curDiffPos;
@@ -129,10 +128,9 @@ namespace hdiff_private{
         TNewDataSubDiffStream&  subStream;
         TNewDataDiffStream&     diffStream;
         void _update(){
-            if (curi+1<covers.coverCount()){
-                TCover c,cnext;
-                covers.covers(curi++,&c);
-                covers.covers(curi,&cnext);
+            if (curi+1<covers.size()){
+                const TCover& c=covers[curi++];
+                const TCover& cnext=covers[curi];
                 curCtrlLen=3*8;
                 curDiffLen=cnext.newPos-(c.newPos+c.length);
                 curSubLen=c.length;
@@ -184,8 +182,9 @@ namespace hdiff_private{
     };
 
 static void serialize_bsdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                             const TCovers& covers,const hpatch_TStreamOutput* out_diff,
-                             const hdiff_TCompress* compressPlugin,bool isEndsleyBsdiff,bool isZeroSubDiff=false){
+                             const TInputCovers& covers,const hpatch_TStreamOutput* out_diff,
+                             const hdiff_TCompress* compressPlugin,bool isEndsleyBsdiff,bool isExtendCover){
+    _out_diff_info("  serialize %s diffData ...\n",isEndsleyBsdiff?"endsley/bsdiff":"bsdiff4");
     std::vector<unsigned char> buf;
     TDiffStream outDiff(out_diff);
     size_t ctrlDataSize_pos;
@@ -204,7 +203,7 @@ static void serialize_bsdiff(const hpatch_TStreamInput* newData,const hpatch_TSt
     if (isEndsleyBsdiff){ 
         // endsley/bsdiff
         TCtrlStream             ctrlStream(covers);
-        TNewDataSubDiffStream   subStream(newData,oldData,covers,true,isZeroSubDiff);
+        TNewDataSubDiffStream   subStream(newData,oldData,covers,true,isExtendCover);
         TNewDataDiffStream      diffStream(covers,newData);
 
         TInterlaceStream interlaceStream(covers,ctrlStream,subStream,diffStream);
@@ -224,7 +223,7 @@ static void serialize_bsdiff(const hpatch_TStreamInput* newData,const hpatch_TSt
     }
 
     {//sub data
-        TNewDataSubDiffStream subStream(newData,oldData,covers,true,isZeroSubDiff);
+        TNewDataSubDiffStream subStream(newData,oldData,covers,true,isExtendCover);
         hpatch_StreamPos_t subDataSize=outDiff.pushStream(&subStream,compressPlugin,true);
 
         size_t subDataSize_pos=ctrlDataSize_pos+8;
@@ -266,24 +265,18 @@ static void _to_bsdiff_covers(std::vector<_TCover>& covers,_TSize newSize){
 void _create_bsdiff(const unsigned char* newData,const unsigned char* cur_newData_end,const unsigned char* newData_end,
                     const unsigned char* oldData,const unsigned char* cur_oldData_end,const unsigned char* oldData_end,
                     const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
-                    bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                    ICoverLinesListener* listener,size_t threadNum){
-    _out_diff_info("  serialize %s diffData ...\n",isEndsleyBsdiff?"endsley/bsdiff":"bsdiff4");
-    std::vector<hpatch_TCover_sz> covers;
+                    bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
+    std::vector<TCover> covers;
+    const bool isExtendCover=true;
     get_match_covers_by_sstring(newData,cur_newData_end,oldData,cur_oldData_end,covers,
-                                kMinSingleMatchScore,isUseBigCacheMatch,listener,threadNum);
+                                kMinSingleMatchScore,isUseBigCacheMatch,threadNum,isExtendCover);
 
-    hpatch_TStreamInput _newStream;  hpatch_TStreamInput* newStream=&_newStream;
-    hpatch_TStreamInput _oldStream;  hpatch_TStreamInput* oldStream=&_oldStream;
-    mem_as_hStreamInput(newStream,newData,newData_end);
-    mem_as_hStreamInput(oldStream,oldData,oldData_end);
-    if (listener&&listener->map_streams_befor_serialize)
-        listener->map_streams_befor_serialize(listener,(const hpatch_TStreamInput **)&newStream,(const hpatch_TStreamInput **)&oldStream);
+    hpatch_TStreamInput newStream,oldStream;
+    mem_as_hStreamInput(&newStream,newData,newData_end);
+    mem_as_hStreamInput(&oldStream,oldData,oldData_end);
 
-    _to_bsdiff_covers(covers,(size_t)(newStream->streamSize));
-    const TCovers _covers((void*)covers.data(),covers.size(),
-                          sizeof(*covers.data())==sizeof(hpatch_TCover32));
-    serialize_bsdiff(newStream,oldStream,_covers,out_diff,compressPlugin,isEndsleyBsdiff);
+    _to_bsdiff_covers(covers,newStream.streamSize);
+    serialize_bsdiff(&newStream,&oldStream,covers,out_diff,compressPlugin,isEndsleyBsdiff,isExtendCover);
 }
 
 }//end namespace hdiff_private
@@ -293,76 +286,80 @@ using namespace hdiff_private;
 void create_bsdiff(const unsigned char* newData,const unsigned char* newData_end,
                    const unsigned char* oldData,const unsigned char* oldData_end,
                    const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
-                   bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                   ICoverLinesListener* coverLinesListener,size_t threadNum){
-    _create_bsdiff(newData,newData_end,newData_end,oldData,oldData_end,oldData_end,
-                   out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,
-                   coverLinesListener,threadNum);
+                   bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
+    _create_bsdiff(newData,newData_end,newData_end,oldData,oldData_end,oldData_end,out_diff,
+                   compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,threadNum);
 }
 void create_bsdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                    const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
-                   bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                   ICoverLinesListener* coverLinesListener,size_t threadNum){
+                   bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,size_t threadNum){
     TAutoMem oldAndNewData;
     loadOldAndNewStream(oldAndNewData,oldData,newData);
     size_t old_size=oldData?(size_t)oldData->streamSize:0;
     unsigned char* pOldData=oldAndNewData.data();
     unsigned char* pNewData=pOldData+old_size;
     unsigned char* pNewDataEnd=pNewData+(size_t)newData->streamSize;
-    _create_bsdiff(pNewData,pNewDataEnd,pNewDataEnd,pOldData,pOldData+old_size,pOldData+old_size,
-                   out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,
-                   coverLinesListener,threadNum);
+    _create_bsdiff(pNewData,pNewDataEnd,pNewDataEnd,pOldData,pOldData+old_size,pOldData+old_size,out_diff,
+                   compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,threadNum);
 }
 
 void create_bsdiff_stream(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                           const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
                           bool isEndsleyBsdiff,size_t kMatchBlockSize,const hdiff_TMTSets_s* mtsets){
-    TCoversBuf covers(newData->streamSize,oldData->streamSize);
-    get_match_covers_by_block(newData,oldData,&covers,kMatchBlockSize,mtsets);
-    if (covers._isCover32)
-        _to_bsdiff_covers(covers.m_covers_limit,(hpatch_uint32_t)newData->streamSize);
-    else
-        _to_bsdiff_covers(covers.m_covers_larger,newData->streamSize);
-    covers.update();
-    serialize_bsdiff(newData,oldData,covers,out_diff,compressPlugin,isEndsleyBsdiff,true);
+    std::vector<TCover> covers;
+    get_match_covers_by_stream(newData,oldData,covers,kMatchBlockSize,mtsets);
+    _to_bsdiff_covers(covers,newData->streamSize);
+    serialize_bsdiff(newData,oldData,covers,out_diff,compressPlugin,isEndsleyBsdiff,false);
+}
+
+
+void create_bsdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
+                          bool isEndsleyBsdiff,size_t kOldWindowSize,size_t kSegSize,
+                          size_t kBigCoverSize,size_t kMatchBlockSize,size_t fastMatchBlockSize,
+                          int kMinSingleMatchScore,bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    const size_t kNewWindowSize = ~(size_t)0;
+    std::vector<TCover> covers;
+    const bool isExtendCover=true;
+    get_match_covers_by_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,covers,
+                               kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
+                               isUseBigCacheMatch,mtsets,isExtendCover);
+    _to_bsdiff_covers(covers,newData->streamSize);
+    serialize_bsdiff(newData,oldData,covers,out_diff,compressPlugin,isEndsleyBsdiff,isExtendCover);
 }
 
 
 void create_bsdiff_block(unsigned char* newData,unsigned char* newData_end,
                          unsigned char* oldData,unsigned char* oldData_end,
                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
-                         bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                         size_t matchBlockSize,size_t threadNum){
-    if (matchBlockSize==0){
-        _create_bsdiff(newData,newData_end,newData_end,oldData,oldData_end,oldData_end,
-                       out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,0,threadNum);
-        return;
-    }
-    TCoversOptimMem coversOp(newData,newData_end,oldData,oldData_end,matchBlockSize,threadNum);
-    _create_bsdiff(newData,coversOp.matchBlock->newData_end_cur,newData_end,
-                   oldData,coversOp.matchBlock->oldData_end_cur,oldData_end,
-                   out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,&coversOp,threadNum);   
+                         bool isEndsleyBsdiff,size_t fastMatchBlockSize,int kMinSingleMatchScore,
+                         bool isUseBigCacheMatch,size_t threadNum){
+    std::vector<TCover> covers;
+    const bool isExtendCover=true;
+    get_match_covers_by_stream_and_sstring(newData,newData_end,oldData,oldData_end,
+                                           covers,fastMatchBlockSize,kMinSingleMatchScore,
+                                           isUseBigCacheMatch,threadNum,isExtendCover);
+    _to_bsdiff_covers(covers,(hpatch_StreamPos_t)(size_t)(newData_end-newData));
+
+    hdiff_TStreamInput newStream,oldStream;
+    mem_as_hStreamInput(&newStream,newData,newData_end);
+    mem_as_hStreamInput(&oldStream,oldData,oldData_end);
+    serialize_bsdiff(&newStream,&oldStream,covers,out_diff,compressPlugin,isEndsleyBsdiff,isExtendCover);   
 }
 void create_bsdiff_block(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                          const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin,
-                         bool isEndsleyBsdiff,int kMinSingleMatchScore,bool isUseBigCacheMatch,
-                         size_t matchBlockSize,size_t threadNumForMem,size_t threadNumForStream){
-    if (matchBlockSize==0){
-        TAutoMem oldAndNewData;
-        loadOldAndNewStream(oldAndNewData,oldData,newData);
-        size_t old_size=oldData?(size_t)oldData->streamSize:0;
-        unsigned char* pOldData=oldAndNewData.data();
-        unsigned char* pNewData=pOldData+old_size;
-        _create_bsdiff(pNewData,pNewData+(size_t)newData->streamSize,pNewData+(size_t)newData->streamSize,
-                       pOldData,pOldData+old_size,pOldData+old_size,
-                       out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,isUseBigCacheMatch,0,threadNumForMem);
-        return;
-    }
-    TCoversOptimStream coversOp(newData,oldData,matchBlockSize,threadNumForMem,threadNumForStream);
-    _create_bsdiff(coversOp.matchBlock->newData,coversOp.matchBlock->newData_end_cur,coversOp.matchBlock->newData_end_cur,
-                   coversOp.matchBlock->oldData,coversOp.matchBlock->oldData_end_cur,coversOp.matchBlock->oldData_end_cur,
-                   out_diff,compressPlugin,isEndsleyBsdiff,kMinSingleMatchScore,
-                   isUseBigCacheMatch,&coversOp,threadNumForMem);
+                         bool isEndsleyBsdiff,size_t fastMatchBlockSize,int kMinSingleMatchScore,
+                         bool isUseBigCacheMatch,const hdiff_TMTSets_s* mtsets){
+    TCachedNewOldStreams cacheStreams;
+    std::vector<TCover> covers;
+    const bool isExtendCover=true;
+    get_match_covers_by_stream_and_sstring(newData,oldData,covers,fastMatchBlockSize,
+                                           kMinSingleMatchScore,isUseBigCacheMatch,
+                                           mtsets,isExtendCover,&cacheStreams);
+    _to_bsdiff_covers(covers,newData->streamSize);
+
+    serialize_bsdiff(cacheStreams.newStream,cacheStreams.oldStream,covers,out_diff,
+                     compressPlugin,isEndsleyBsdiff,isExtendCover);
 }
 
 bool check_bsdiff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,

@@ -27,9 +27,8 @@
  */
 #ifndef hdiff_match_block_h
 #define hdiff_match_block_h
-#include "diff.h"
+#include "../diff_types.h"
 #include <vector>
-static const size_t kDefaultFastMatchBlockSize = 1024*1;
 namespace hdiff_private{
     struct TAutoMem;
     
@@ -37,12 +36,13 @@ namespace hdiff_private{
         typedef hpatch_TCover TPackedCover;
         TMatchBlockBase(size_t _matchBlockSize,size_t _threadNum)
         :matchBlockSize(_matchBlockSize),threadNum(_threadNum){}
+		inline void swapBlockCovers(std::vector<TCover>& _blockCovers){ blockCovers.swap(_blockCovers); }
     protected:
         void _getPackedCover(hpatch_StreamPos_t newDataSize,hpatch_StreamPos_t oldDataSize);
-        void _unpackData(IDiffInsertCover* diffi,void*& pcovers,size_t& coverCount,bool isCover32);
+        void _unpackData(IDiffInsertCover* diffi,hpatch_TCover*& pcovers,size_t& coverCount);
         const size_t   matchBlockSize;
         const size_t   threadNum;
-        std::vector<hpatch_TCover> blockCovers;
+        std::vector<TCover> blockCovers;
         std::vector<TPackedCover> packedCoversForOld;
         std::vector<TPackedCover> packedCoversForNew;
     };
@@ -66,7 +66,7 @@ namespace hdiff_private{
         void getBlockCovers();
         inline void getPackedCover() { _getPackedCover(newData_end-newData,oldData_end-oldData); }
         void packData();
-        void unpackData(IDiffInsertCover* diffi,void* pcovers,size_t coverCount,bool isCover32);
+        void unpackData(IDiffInsertCover* diffi,hpatch_TCover* pcovers,size_t coverCount);
     };
 
     //remove some big match block befor diff, used stream
@@ -86,8 +86,8 @@ namespace hdiff_private{
         void getBlockCovers();
         inline void getPackedCover() { _getPackedCover(newStream->streamSize,oldStream->streamSize); }
         void packData();
-        void unpackData(IDiffInsertCover* diffi,void* pcovers,size_t coverCount,bool isCover32);
-        void map_streams(const hpatch_TStreamInput** pnewData,const hpatch_TStreamInput** poldData);
+        void unpackData(IDiffInsertCover* diffi,hpatch_TCover* pcovers,size_t coverCount);
+        void cachedStreams(const hpatch_TStreamInput** pnewData,const hpatch_TStreamInput** poldData);
 
         struct TStreamInputMap:public hpatch_TStreamInput{
             const hpatch_TStreamInput*  baseStream;
@@ -114,21 +114,16 @@ namespace hdiff_private{
         }
         _TMatchBlock* matchBlock;
     protected:
-        static void _insert_cover(ICoverLinesListener* listener,IDiffInsertCover* diffi,void* pcovers,size_t coverCount,
-                                  bool isCover32,hpatch_StreamPos_t* newSize,hpatch_StreamPos_t* oldSize){
+        static void _insert_cover(ICoverLinesListener* listener,IDiffInsertCover* diffi,hpatch_TCover* pcovers,size_t coverCount,
+                                  hpatch_StreamPos_t* newSize,hpatch_StreamPos_t* oldSize){
             TCoversOptim<_TMatchBlock>* self=(TCoversOptim<_TMatchBlock>*)listener;
             if (self->matchBlock!=0){
                 assert(self->matchBlock->curNewDataSize()==*newSize);
                 assert(self->matchBlock->curOldDataSize()==*oldSize);
-                self->matchBlock->unpackData(diffi,pcovers,coverCount,isCover32);
+                self->matchBlock->unpackData(diffi,pcovers,coverCount);
                 *newSize=self->matchBlock->curNewDataSize();
                 *oldSize=self->matchBlock->curOldDataSize();
             }
-        }
-        inline void _doPack(){
-            matchBlock->getBlockCovers();
-            matchBlock->getPackedCover();
-            matchBlock->packData();
         }
     };
 
@@ -138,7 +133,9 @@ namespace hdiff_private{
                        size_t matchBlockSize,size_t threadNum)
         :TCoversOptim<TMatchBlockMem>(&_matchBlock),
          _matchBlock(newData,newData_end,oldData,oldData_end,matchBlockSize,threadNum){
-            _doPack();
+            matchBlock->getBlockCovers();
+            matchBlock->getPackedCover();
+            matchBlock->packData();
         }
     protected:
         TMatchBlockMem _matchBlock;
@@ -149,74 +146,32 @@ namespace hdiff_private{
                        size_t matchBlockSize,size_t threadNumForMem,size_t threadNumForStream)
         :TCoversOptim<TMatchBlockStream>(&_matchBlock),
          _matchBlock(newStream,oldStream,matchBlockSize,threadNumForMem,threadNumForStream){
-            map_streams_befor_serialize=_map_streams_befor_serialize;//for ICoverLinesListener
-            _doPack();
+            matchBlock->getBlockCovers();
+            matchBlock->getPackedCover();
+            matchBlock->packData();
+        }
+        inline void cachedStreams(const hpatch_TStreamInput** pnewData,const hpatch_TStreamInput** poldData){
+            _matchBlock.cachedStreams(pnewData,poldData);
         }
     protected:
         TMatchBlockStream _matchBlock;
-        static void _map_streams_befor_serialize(ICoverLinesListener* listener,const hpatch_TStreamInput** pnewData,const hpatch_TStreamInput** poldData){
-            TCoversOptimStream* self=(TCoversOptimStream*)listener;
-            self->_matchBlock.map_streams(pnewData,poldData);
-        }
     };
     
-    void loadOldAndNewStream(TAutoMem& out_mem,const hpatch_TStreamInput* oldStream,const hpatch_TStreamInput* newStream);
+    struct TCoversOptimMem_blockCovers:public TCoversOptim<TMatchBlockMem>{
+        TCoversOptimMem_blockCovers(unsigned char* newData,unsigned char* newData_end,
+                                    unsigned char* oldData,unsigned char* oldData_end,
+                                    std::vector<TCover>& _blockCovers,size_t threadNum)
+        :TCoversOptim<TMatchBlockMem>(&_matchBlock),
+         _matchBlock(newData,newData_end,oldData,oldData_end,0,threadNum){
+            matchBlock->swapBlockCovers(_blockCovers);//got blockCovers
+            matchBlock->getPackedCover();
+            matchBlock->packData();
+        }
+    protected:
+        TMatchBlockMem _matchBlock;
+    };
 
 } //namespace hdiff_private
 
-
-//optimize diff speed by match block
-//note: newData&oldData in memory will be changed
-//see create_compressed_diff | create_single_compressed_diff
-
-void create_compressed_diff_block(const hpatch_TStreamInput* newData,//will load needed in memory
-                                  const hpatch_TStreamInput* oldData,//will load needed in memory
-                                  const hpatch_TStreamOutput* out_diff,
-                                  const hdiff_TCompress* compressPlugin=0,
-                                  int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                  bool isUseBigCacheMatch=false,
-                                  size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                  size_t threadNumForMem=1,size_t threadNumForStream=1);
-void create_compressed_diff_block(unsigned char* newData,unsigned char* newData_end,
-                                  unsigned char* oldData,unsigned char* oldData_end,
-                                  const hpatch_TStreamOutput* out_diff,
-                                  const hdiff_TCompress* compressPlugin=0,
-                                  int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                  bool isUseBigCacheMatch=false,
-                                  size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                  size_t threadNum=1);
-void create_compressed_diff_block(unsigned char* newData,unsigned char* newData_end,
-                                  unsigned char* oldData,unsigned char* oldData_end,
-                                  std::vector<unsigned char>& out_diff,
-                                  const hdiff_TCompress* compressPlugin=0,
-                                  int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                  bool isUseBigCacheMatch=false,
-                                  size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                  size_t threadNum=1);
-
-void create_single_compressed_diff_block(const hpatch_TStreamInput* newData,//will load needed in memory
-                                         const hpatch_TStreamInput* oldData,//will load needed in memory
-                                         const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin=0,
-                                         int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                         size_t patchStepMemSize=kDefaultPatchStepMemSize,
-                                         bool isUseBigCacheMatch=false,
-                                         size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                         size_t threadNumForMem=1,size_t threadNumForStream=1);
-void create_single_compressed_diff_block(unsigned char* newData,unsigned char* newData_end,
-                                         unsigned char* oldData,unsigned char* oldData_end,
-                                         const hpatch_TStreamOutput* out_diff,const hdiff_TCompress* compressPlugin=0,
-                                         int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                         size_t patchStepMemSize=kDefaultPatchStepMemSize,
-                                         bool isUseBigCacheMatch=false,
-                                         size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                         size_t threadNum=1);
-void create_single_compressed_diff_block(unsigned char* newData,unsigned char* newData_end,
-                                         unsigned char* oldData,unsigned char* oldData_end,
-                                         std::vector<unsigned char>& out_diff,const hdiff_TCompress* compressPlugin=0,
-                                         int kMinSingleMatchScore=kMinSingleMatchScore_default,
-                                         size_t patchStepMemSize=kDefaultPatchStepMemSize,
-                                         bool isUseBigCacheMatch=false,
-                                         size_t matchBlockSize=kDefaultFastMatchBlockSize,
-                                         size_t threadNum=1);
 
 #endif //hdiff_match_block_h

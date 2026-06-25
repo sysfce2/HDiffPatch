@@ -2,6 +2,17 @@
 
 full changelog at: https://github.com/sisong/HDiffPatch/commits   
 
+## [v5.0.0](https://github.com/sisong/HDiffPatch/tree/v5.0.0) - 2026-06-25
+### Added
+* add new format Window Diff(`HDIFFW26`) for optimize patch speed, by `$hdiffz -WD[-stepSize]`;
+* new format Window Diff native support checksum, & auto run checksum when patch;
+* cmdline hdiffz support `-w[-oldWinSize-segSize]` window mode diff for -WD; & can run with -SD or other Diff format;
+* fully compatible with VCDIFF format window constraints when diff by `$hdiffz -VCD[...] -w[-oldWinSize-segSize-newWinSize]`;
+* add function create_window_diff()/patch_window_diff()/serialize_window_diff()/resave_window_diff()/getWindowDiffInfo();
+### Changed
+* remove hpatch_TCover32/hpatch_TCover_sz/hpatch_TOutputCovers types, all use 64-bit hpatch_TCover;
+* `-m` default match score changed from 6 to 4;
+
 ## [v4.12.2](https://github.com/sisong/HDiffPatch/tree/v4.12.2) - 2026-03-09
 ### Fixed
 *  Fixed the linking libhpatchz.a error in iOS & MacOS SDK;

@@ -33,7 +33,6 @@
 #include "../../libHDiffPatch/HDiff/private_diff/limit_mem_diff/adler_roll.h"
 #include "../../libHDiffPatch/HDiff/private_diff/limit_mem_diff/stream_serialize.h"
 #include "../../libHDiffPatch/HDiff/diff.h"
-#include "../../libHDiffPatch/HDiff/match_block.h"
 #include "../../libHDiffPatch/HPatch/patch.h"
 #include "../dir_patch/dir_patch.h"
 #include "../dir_patch/dir_patch_private.h"
@@ -43,7 +42,7 @@ using namespace hdiff_private;
 static const char* kDirDiffVersionType= "HDIFF19";
 
 static std::string  cmp_hash_type    =  "fadler64";
-#define cmp_hash_value_t                uint64_t
+#define cmp_hash_value_t                hpatch_uint64_t
 #define cmp_hash_begin(ph)              { (*(ph))=ADLER_INITIAL; }
 #define cmp_hash_append(ph,pvalues,n)   { (*(ph))=fast_adler64_append(*(ph),pvalues,n); }
 #define cmp_hash_end(ph)                {}
@@ -263,7 +262,7 @@ struct CChecksumCombine:public CChecksum{
             }
         }
     }
-    inline void combine(cmp_hash_value_t rightHash,uint64_t rightLen){
+    inline void combine(cmp_hash_value_t rightHash,hpatch_uint64_t rightLen){
         cmp_hash_combine(&_combineHash,rightHash,rightLen);
     }
     const bool              _isCanUseCombine;
@@ -487,20 +486,38 @@ void dir_diff(IDirDiffListener* listener,const TManifest& oldManifest,
     {
         const hdiff_TMTSets_s mtsets={hdiffSets.threadNum,hdiffSets.threadNumSearch_s,false,false};
         TOffsetStreamOutput ofStream(outDiffStream,writeToPos);
-        if (hdiffSets.isSingleCompressedDiff){
-            if (hdiffSets.isDiffInMem)
+        if (hdiffSets.isWindowDiff){
+            create_window_diff(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,0,
+                         hdiffSets.patchStepMemSize, hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                         hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                         (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                         hdiffSets.isUseBigCacheMatch,&mtsets);
+        }else if (hdiffSets.isSingleCompressedDiff){
+            if (hdiffSets.isWindowDiffMode)
+                create_single_compressed_diff_window(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
+                                                     hdiffSets.patchStepMemSize, hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                                                     hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                                                     (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                                                     hdiffSets.isUseBigCacheMatch,&mtsets);
+            else if (hdiffSets.isDiffInMem)
                 create_single_compressed_diff_block(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
-                                                    (int)hdiffSets.matchScore,hdiffSets.patchStepMemSize,hdiffSets.isUseBigCacheMatch,
-                                                    hdiffSets.matchBlockSize,hdiffSets.threadNum,hdiffSets.threadNumSearch_s);
+                                                    hdiffSets.patchStepMemSize,hdiffSets.matchBlockSize,
+                                                    (int)hdiffSets.matchScore,hdiffSets.isUseBigCacheMatch,&mtsets);
             else
                 create_single_compressed_diff_stream(newRefStream.stream,oldRefStream.stream,&ofStream,
-                                                     compressPlugin,hdiffSets.matchBlockSize,
-                                                     hdiffSets.patchStepMemSize,&mtsets);
+                                                     compressPlugin,hdiffSets.patchStepMemSize,
+                                                     hdiffSets.matchBlockSize,&mtsets);
         }else{
-            if (hdiffSets.isDiffInMem)
+            if (hdiffSets.isWindowDiffMode)
+                create_compressed_diff_window(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
+                                              hdiffSets.windowOldSize,hdiffSets.windowSegSize,
+                                              hdiffSets.bigCoverSize,(hdiffSets.isDiffInMem?0:hdiffSets.matchBlockSize),
+                                              (hdiffSets.isDiffInMem?hdiffSets.matchBlockSize:0),(int)hdiffSets.matchScore,
+                                              hdiffSets.isUseBigCacheMatch,&mtsets);
+            else if (hdiffSets.isDiffInMem)
                 create_compressed_diff_block(newRefStream.stream,oldRefStream.stream,&ofStream,compressPlugin,
-                                             (int)hdiffSets.matchScore,hdiffSets.isUseBigCacheMatch,
-                                             hdiffSets.matchBlockSize,hdiffSets.threadNum,hdiffSets.threadNumSearch_s);
+                                             hdiffSets.matchBlockSize,(int)hdiffSets.matchScore,
+                                             hdiffSets.isUseBigCacheMatch,&mtsets);
             else
                 create_compressed_diff_stream(newRefStream.stream,oldRefStream.stream,&ofStream,
                                               compressPlugin,hdiffSets.matchBlockSize,&mtsets);
@@ -664,7 +681,7 @@ bool check_dirdiff(IDirDiffListener* listener,const TManifest& oldManifest,const
     CDirPatchListener    patchListener(newManifest.rootPath,oldList,newList);
     CDirPatcher          dirPatcher;
     const TDirDiffInfo*  dirDiffInfo=0;
-    TDirPatchChecksumSet    checksumSet={checksumPlugin,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE};
+    TPatchChecksumSet    checksumSet={checksumPlugin,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE,hpatch_TRUE};
 
     const hpatch_TStreamInput*  oldStream=0;
     const hpatch_TStreamOutput* newStream=0;
@@ -689,6 +706,8 @@ bool check_dirdiff(IDirDiffListener* listener,const TManifest& oldManifest,const
     size_t      temp_cache_size=hdiff_kFileIOBufBestSize*(1+16);
     if (dirDiffInfo->isSingleCompressedDiff)
         temp_cache_size+=(size_t)dirDiffInfo->sdiffInfo.stepMemSize;
+    if (dirDiffInfo->isWindowDiff)
+        temp_cache_size+=(size_t)(dirDiffInfo->winDiffInfo.maxWindowOldSize+dirDiffInfo->winDiffInfo.maxStepMemSize);
     TAutoMem    p_temp_mem(temp_cache_size);
     TByte*      temp_cache=p_temp_mem.data();
 
@@ -821,12 +840,17 @@ void resave_dirdiff(const hpatch_TStreamInput* in_diff,hpatch_TDecompress* decom
         TOffsetStreamOutput ofStream(out_diff,writeToPos);
         TStreamClip clip(in_diff,head.hdiffDataOffset,head.hdiffDataOffset+head.hdiffDataSize);
         
-        hpatch_singleCompressedDiffInfo singleDiffInfo;
-        hpatch_BOOL isSingleStreamDiff=getSingleCompressedDiffInfo(&singleDiffInfo,&clip,0);
-        if (isSingleStreamDiff){
-            resave_single_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin,&singleDiffInfo);
+        hpatch_windowDiffInfo winDiffInfo;
+        if (getWindowDiffInfo(&winDiffInfo,&clip,0)){
+            resave_window_diff(&clip,decompressPlugin,&ofStream,compressPlugin,0,&winDiffInfo);
         }else{
-            resave_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin);
+            hpatch_singleCompressedDiffInfo singleDiffInfo;
+            hpatch_BOOL isSingleStreamDiff=getSingleCompressedDiffInfo(&singleDiffInfo,&clip,0);
+            if (isSingleStreamDiff){
+                resave_single_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin,&singleDiffInfo);
+            }else{
+                resave_compressed_diff(&clip,decompressPlugin,&ofStream,compressPlugin);
+            }
         }
         writeToPos+=ofStream.outSize;
     }

@@ -44,7 +44,8 @@ void                    hpatch_mt_setOnThreadEnd(struct hpatch_mt_t* self,void* 
                                                  void (*onFinishThread)(void* finishThreadListener));
 hpatch_BOOL             hpatch_mt_beforeThreadBegin(struct hpatch_mt_t* self); //a thread begin
 void                    hpatch_mt_onThreadEnd(struct hpatch_mt_t* self); //a thread exit
-hpatch_BOOL             hpatch_mt_registeCondvar(struct hpatch_mt_t* self,HCondvar waitCondvar); //when onError or onFinish, got broadcast
+hpatch_BOOL             hpatch_mt_registeCondvar(struct hpatch_mt_t* self,HCondvar waitCondvar,
+                                                  HLocker locker,volatile hpatch_BOOL* isOnErrorPtr); //when onError or onFinish, got broadcast
 hpatch_BOOL             hpatch_mt_unregisteCondvar(struct hpatch_mt_t* self,HCondvar waitCondvar);
 void                    hpatch_mt_setOnError(struct hpatch_mt_t* self); //set thread got a error
 hpatch_BOOL             hpatch_mt_isOnError(struct hpatch_mt_t* self);

@@ -492,7 +492,7 @@ TSyncClient_resultType
                                       newSyncInfo->savedNewDataCheckChecksum,fileChecksumPlugin,checkChecksum);
             check(0==memcmp(newSyncInfo->savedNewDataCheckChecksum+fileChecksumByteSize,
                             newSyncInfo->savedNewDataCheckChecksum,fileChecksumByteSize),
-                  kSyncClient_newDataCheckChecksumError);
+                  kSyncClient_newDataChecksumConflictError);
         }
     }
     

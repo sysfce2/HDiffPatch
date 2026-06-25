@@ -30,6 +30,7 @@
 #define HPatch_patch_h
 #include "patch_types.h"
 #include "hpatch_mt/hpatch_mt.h"
+#include "checksum_plugin.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -245,6 +246,36 @@ hpatch_BOOL patch_single_stream_diff(const hpatch_TStreamOutput*  out_newData,  
                                      sspatch_coversListener_t* coversListener,
                                      hpatch_BOOL isNeedOutCache //default true: each time accumulating some data be write to out_newData;
                                     );
+
+
+hpatch_BOOL getWindowDiffInfo(hpatch_windowDiffInfo*      out_diffInfo,
+                              const hpatch_TStreamInput*  windowDiff,   //sequential read
+                              hpatch_StreamPos_t diffInfo_pos//default 0, begin pos in windowDiff
+                              );
+
+typedef enum TWindowPatchResult{
+    kWindowPatch_ok=0,
+    kWindowPatch_load_head_error,
+    kWindowPatch_new_size_error,
+    kWindowPatch_old_size_error,
+    kWindowPatch_onDiffInfo_error,
+    kWindowPatch_temp_mem_error,
+    kWindowPatch_decompress_open_error,
+    kWindowPatch_patch_error,
+    kWindowPatch_checksum_plugin_error,
+    kWindowPatch_checksum_open_error,
+    kWindowPatch_checksum_old_error,
+    kWindowPatch_checksum_new_error,
+    kWindowPatch_checksum_diff_error,
+} TWindowPatchResult;
+
+TWindowPatchResult patch_window_diff(struct winpatch_listener_t*  listener,
+                                     const hpatch_TStreamOutput*  out_newData,         //sequential write
+                                     const hpatch_TStreamInput*   oldData,             //random read
+                                     const hpatch_TStreamInput*   windowDiff,          //sequential read
+                                     hpatch_StreamPos_t  diffInfo_pos, //default 0, begin pos in windowDiff
+                                     size_t             threadNum   //1 for single-threaded, 2..5 for MT I/O
+                                     );
 
 #ifdef __cplusplus
 }
