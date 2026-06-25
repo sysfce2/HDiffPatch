@@ -362,7 +362,8 @@ static _mt_manager_base_t* _mt_manager_base_open(const hpatch_TStreamOutput** po
             *pcoversListener=out_coversListener;
             temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+hcache_old_mt_t_memSize(),kAlignSize);
         }else{
-            hpatch_byte* oldCacheBuf=temp_cache; temp_cache+=windowOldBufSize;
+            hpatch_byte* oldCacheBuf=temp_cache;
+            temp_cache=(hpatch_byte*)_hpatch_align_upper(temp_cache+windowOldBufSize,kAlignSize);
             self->_old=hcache_window_old_open(temp_cache,hcache_window_old_mt_t_memSize(),self->h_mt,
                                               oldCacheBuf,windowOldBufSize,*poldData,windowCount);
             if (self->_old==0) goto _on_error;

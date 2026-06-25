@@ -2,7 +2,7 @@
 
 full changelog at: https://github.com/sisong/HDiffPatch/commits   
 
-## [v5.0.0](https://github.com/sisong/HDiffPatch/tree/v5.0.0) - 2026-06-24
+## [v5.0.0](https://github.com/sisong/HDiffPatch/tree/v5.0.0) - 2026-06-25
 ### Added
 * add new format Window Diff(`HDIFFW26`) for optimize patch speed, by `$hdiffz -WD[-stepSize]`;
 * new format Window Diff native support checksum, & auto run checksum when patch;

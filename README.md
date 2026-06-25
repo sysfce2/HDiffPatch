@@ -415,9 +415,9 @@ case list([download from OneDrive](https://1drv.ms/u/s!Aj8ygMPeifoQgULlawtabR9lh
 **hdiffz zlib** diff with `-m-6 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
 **hdiffz lzma2** diff with `-m-6 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
 **hdiffz zstd** diff with `-m-6 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
-**hdiffz -s zlib** diff with `-s-64 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
-**hdiffz -s lzma2** diff with `-s-64 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
-**hdiffz -s zstd** diff with `-s-64 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz s zlib** diff with `-s-64 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
+**hdiffz s lzma2** diff with `-s-64 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz s zstd** diff with `-s-64 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
 & adding all **hdiffz**  test with -p-8   
 **hpatchz** patch with `-s-3m -f {old} {pat} {new}`    
 **hsynz** test, make sync info by `hsync_make -s-2k {new} {out_newi} {out_newz}`,    
@@ -426,6 +426,25 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
 **hsynz p8 zlib** run hsync_make with `-p-8 -c-zlib-9` (run `hsync_demo` with `-p-8`)   
 **hsynz p1 zstd** run hsync_make with `-p-1 -c-zstd-21-24`   
 **hsynz p8 zstd** run hsync_make with `-p-8 -c-zstd-21-24` (run `hsync_demo` with `-p-8`)   
+   
+update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
+**hdiffz w p1 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+**hdiffz w p8 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+**hdiffz w p8 lzma2** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz w p8 zstd** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sw p8 lzma2** diff with `-s-64 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sw p8 zstd** diff with `-s-64 -SD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz WD p1 lzma2** diff with `-m-6 -WD -w-2m -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz WD p8 lzma2** diff with `-m-6 -WD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz WD p1 zstd** diff with `-m-6 -WD -w-2m -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz WD p8 zstd** diff with `-m-6 -WD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sWD p1 lzma2** diff with `-s-64 -WD -w-2m -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sWD p8 lzma2** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
+**hdiffz sWD p1 zstd** diff with `-s-64 -WD -w-2m -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
+**hdiffz sWD p8 zstd** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
+ & **hpatchz** patch with `-s-8m -C-no -p-1 -f {old} {pat} {new}` when diff with `-WD -p-1`   
+ & **hpatchz** patch with `-s-8m -C-no -p-5 -f {old} {pat} {new}` when diff with `-WD -p-8`   
    
 **test result average**:
 |Program|compress|diff mem|speed|patch mem|max mem|speed|
@@ -437,31 +456,46 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
 ||
 |zstd --patch-from|7.96%|2798M|3.3MB/s|629M|2303M|828MB/s|
 |xdelta3|13.60%|409M|6.9MB/s|86M|102M|159MB/s|
-|xdelta3 +hpatchz -m|13.60%|409M|6.9MB/s|70M|82M|377MB/s|
+|xdelta3 +hpatchz|13.60%|409M|6.9MB/s|70M|82M|377MB/s|
 |xdelta3 -B|9.63%|2282M|10.9MB/s|460M|2070M|267MB/s|
-|xdelta3 -B +hpatchz -m|9.63%|2282M|10.9MB/s|315M|1100M|477MB/s|
+|xdelta3 -B +hpatchz|9.63%|2282M|10.9MB/s|315M|1100M|477MB/s|
+|hdiffz sw p1 -VCD|9.22%|329M|15.9MB/s|31M|33M|519MB/s|
+|hdiffz sw p8 -VCD|9.22%|506M|48.2MB/s|31M|33M|515MB/s|
 |bsdiff|8.17%|2773M|2.5MB/s|637M|2312M|167MB/s|
 |bsdiff +hpatchz -m|8.17%|2773M|2.5MB/s|321M|1101M|197MB/s|
 |hdiffz p1 -BSD|7.72%|1210M|13.4MB/s|14M|14M|172MB/s|
 |hdiffz p8 -BSD|7.72%|1191M|31.2MB/s|14M|14M|172MB/s|
+||
+|hsynz p1 zlib|20.05%|6M|17.3MB/s|6M|22M|273MB/s|
+|hsynz p8 zlib|20.05%|30M|115.1MB/s|13M|29M|435MB/s|
+|hsynz p1 zstd|14.96%|532M|1.9MB/s|24M|34M|264MB/s|
+|hsynz p8 zstd|14.95%|3349M|10.1MB/s|24M|34M|410MB/s|
+||
 |hdiffz p1 zlib|7.79%|1214M|14.4MB/s|4M|4M|564MB/s|
 |hdiffz p8 zlib|7.79%|1190M|44.8MB/s|4M|4M|559MB/s|
 |hdiffz p1 lzma2|6.44%|1209M|11.4MB/s|16M|20M|431MB/s|
 |hdiffz p8 lzma2|6.44%|1191M|33.4MB/s|16M|20M|428MB/s|
 |hdiffz p1 zstd|6.74%|1211M|11.5MB/s|16M|21M|592MB/s|
 |hdiffz p8 zstd|6.74%|1531M|24.3MB/s|16M|21M|586MB/s|
-|hdiffz -s p1 -BSD|11.96%|91M|46.0MB/s|14M|14M|148MB/s|
-|hdiffz -s p8 -BSD|11.96%|95M|59.8MB/s|14M|14M|148MB/s|
-|hdiffz -s p1 zlib|12.52%|91M|46.4MB/s|3M|4M|611MB/s|
-|hdiffz -s p8 zlib|12.53%|95M|178.9MB/s|3M|4M|609MB/s|
-|hdiffz -s p1 lzma2|9.11%|170M|18.1MB/s|17M|20M|402MB/s|
-|hdiffz -s p8 lzma2|9.13%|370M|50.6MB/s|17M|20M|400MB/s|
-|hdiffz -s p1 zstd|9.60%|195M|18.0MB/s|17M|21M|677MB/s|
-|hdiffz -s p8 zstd|9.60%|976M|28.5MB/s|17M|21M|678MB/s|
-|hsynz p1 zlib|20.05%|6M|17.3MB/s|6M|22M|273MB/s|
-|hsynz p8 zlib|20.05%|30M|115.1MB/s|13M|29M|435MB/s|
-|hsynz p1 zstd|14.96%|532M|1.9MB/s|24M|34M|264MB/s|
-|hsynz p8 zstd|14.95%|3349M|10.1MB/s|24M|34M|410MB/s|
+|hdiffz w p8 lzma2|6.49%|666M|24.3MB/s|20M|25M|730MB/s|
+|hdiffz w p8 zstd|6.78%|966M|19.2MB/s|20M|26M|1253MB/s|
+|hdiffz WD p1 lzma2|6.52%|679M|7.9MB/s|22M|27M|749MB/s|
+|hdiffz WD p8 lzma2|6.52%|666M|24.8MB/s|22M|27M|1020MB/s|
+|hdiffz WD p1 zstd|6.82%|678M|7.9MB/s|22M|28M|1548MB/s|
+|hdiffz WD p8 zstd|6.82%|971M|19.2MB/s|22M|28M|2527MB/s|
+||
+|hdiffz s p1 zlib|12.52%|91M|46.4MB/s|3M|4M|611MB/s|
+|hdiffz s p8 zlib|12.53%|95M|178.9MB/s|3M|4M|609MB/s|
+|hdiffz s p1 lzma2|9.11%|170M|18.1MB/s|17M|20M|402MB/s|
+|hdiffz s p8 lzma2|9.13%|370M|50.6MB/s|17M|20M|400MB/s|
+|hdiffz s p1 zstd|9.60%|195M|18.0MB/s|17M|21M|677MB/s|
+|hdiffz s p8 zstd|9.60%|976M|28.5MB/s|17M|21M|678MB/s|
+|hdiffz sw p8 lzma2|6.76%|253M|33.7MB/s|20M|25M|584MB/s|
+|hdiffz sw p8 zstd|7.07%|851M|24.9MB/s|20M|26M|873MB/s|
+|hdiffz sWD p1 lzma2|6.80%|177M|13.0MB/s|22M|27M|710MB/s|
+|hdiffz sWD p8 lzma2|6.80%|269M|39.6MB/s|22M|27M|988MB/s|
+|hdiffz sWD p1 zstd|7.12%|211M|13.2MB/s|21M|28M|1449MB/s|
+|hdiffz sWD p8 zstd|7.12%|869M|27.9MB/s|21M|28M|2326MB/s|
     
 
 ## input Apk Files for test: 
@@ -516,18 +550,30 @@ case list:
 **sfpatcher -1 clA zstd** v1.3.0 used `$sf_normalize -cl-A` normalized apks before diff   
 adding test hpatchz&sfpatcher on Android, arm CPU Kirin980(2×A76 2.6G + 2×A76 1.92G + 4×A55 1.8G)   
 ( [archive-patcher], [sfpatcher] optimized diff&patch between apk files )  
+   
+update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
 
 **test result average**:
 |Program|compress|diff mem|speed|patch mem|max mem|speed|arm Kirin980|
 |:----|----:|----:|----:|----:|----:|----:|----:|
 |zstd --patch-from|53.18%|2199M|3.6MB/s|209M|596M|609MB/s|
 |xdelta3|54.51%|422M|3.8MB/s|98M|99M|170MB/s|
-|xdelta3 +hpatchz -m|54.51%|422M|3.8MB/s|70M|81M|438MB/s|
+|xdelta3 +hpatchz|54.51%|422M|3.8MB/s|70M|81M|438MB/s|
+|hdiffz sw p1 -VCD|53.73%|288M|9.0MB/s|33M|33M|317MB/s|
+|hdiffz sw p8 -VCD|53.73%|459M|26.2MB/s|33M|33M|318MB/s|
 |bsdiff|53.84%|931M|1.2MB/s|218M|605M|54MB/s|
-|bsdiff+hpatchz -m|53.84%|931M|1.2MB/s|116M|310M|57MB/s|
-|bsdiff+hpatchz -s|53.84%|931M|1.2MB/s|14M|14M|54MB/s|
+|bsdiff +hpatchz -m|53.84%|931M|1.2MB/s|116M|310M|57MB/s|
+|bsdiff +hpatchz -s|53.84%|931M|1.2MB/s|14M|14M|54MB/s|
 |hdiffz p1 -BSD|53.69%|509M|6.8MB/s|14M|14M|55MB/s|
 |hdiffz p8 -BSD|53.70%|514M|15.3MB/s|14M|14M|55MB/s|
+|hsynz p1|62.43%|4M|1533.5MB/s|4M|10M|236MB/s|
+|hsynz p8|62.43%|18M|2336.4MB/s|12M|18M|394MB/s|
+|hsynz p1 zlib|58.67%|5M|22.7MB/s|4M|11M|243MB/s|
+|hsynz p8 zlib|58.67%|29M|138.6MB/s|12M|19M|410MB/s|
+|hsynz p1 zstd|57.74%|534M|2.7MB/s|24M|28M|234MB/s|
+|hsynz p8 zstd|57.74%|3434M|13.4MB/s|24M|28M|390MB/s|
+||
 |hdiffz p1|54.40%|509M|8.8MB/s|5M|6M|682MB/s|
 |hdiffz p8|54.41%|514M|32.4MB/s|5M|6M|686MB/s|443MB/s|
 |hdiffz p1 zlib|53.21%|509M|8.2MB/s|5M|6M|514MB/s|
@@ -536,18 +582,25 @@ adding test hpatchz&sfpatcher on Android, arm CPU Kirin980(2×A76 2.6G + 2×A76 
 |hdiffz p8 lzma2|52.94%|557M|18.9MB/s|21M|22M|261MB/s|131MB/s|
 |hdiffz p1 zstd|53.04%|537M|5.4MB/s|21M|22M|598MB/s|
 |hdiffz p8 zstd|53.05%|1251M|11.1MB/s|21M|22M|604MB/s|371MB/s|
-|hdiffz -s p1 zlib|53.73%|118M|26.8MB/s|4M|6M|513MB/s|
-|hdiffz -s p8 zlib|53.73%|122M|97.3MB/s|4M|6M|513MB/s|
-|hdiffz -s p1 lzma2|53.30%|197M|6.4MB/s|20M|22M|258MB/s|
-|hdiffz -s p8 lzma2|53.30%|309M|32.4MB/s|20M|22M|258MB/s|
-|hdiffz -s p1 zstd|53.44%|221M|10.1MB/s|20M|22M|620MB/s|
-|hdiffz -s p8 zstd|53.44%|1048M|14.4MB/s|20M|22M|613MB/s|
-|hsynz p1|62.43%|4M|1533.5MB/s|4M|10M|236MB/s|
-|hsynz p8|62.43%|18M|2336.4MB/s|12M|18M|394MB/s|
-|hsynz p1 zlib|58.67%|5M|22.7MB/s|4M|11M|243MB/s|
-|hsynz p8 zlib|58.67%|29M|138.6MB/s|12M|19M|410MB/s|
-|hsynz p1 zstd|57.74%|534M|2.7MB/s|24M|28M|234MB/s|
-|hsynz p8 zstd|57.74%|3434M|13.4MB/s|24M|28M|390MB/s|
+|hdiffz w p8 lzma2|53.25%|389M|8.0MB/s|25M|25M|322MB/s|
+|hdiffz w p8 zstd|53.36%|1042M|6.3MB/s|24M|26M|1098MB/s|
+|hdiffz WD p1 lzma2|53.27%|374M|1.7MB/s|27M|27M|303MB/s|
+|hdiffz WD p8 lzma2|53.27%|390M|8.0MB/s|27M|27M|350MB/s|
+|hdiffz WD p1 zstd|53.38%|384M|1.9MB/s|25M|28M|1171MB/s|
+|hdiffz WD p8 zstd|53.38%|1045M|6.2MB/s|20M|28M|1768MB/s|
+|hdiffz s p1 zlib|53.73%|118M|26.8MB/s|4M|6M|513MB/s|
+|hdiffz s p8 zlib|53.73%|122M|97.3MB/s|4M|6M|513MB/s|
+|hdiffz s p1 lzma2|53.30%|197M|6.4MB/s|20M|22M|258MB/s|
+|hdiffz s p8 lzma2|53.30%|309M|32.4MB/s|20M|22M|258MB/s|
+|hdiffz s p1 zstd|53.44%|221M|10.1MB/s|20M|22M|620MB/s|
+|hdiffz s p8 zstd|53.44%|1048M|14.4MB/s|20M|22M|613MB/s|
+|hdiffz sw p8 lzma2|53.27%|299M|19.3MB/s|25M|25M|319MB/s|
+|hdiffz sw p8 zstd|53.38%|1042M|11.3MB/s|25M|26M|1068MB/s|
+|hdiffz sWD p1 lzma2|53.29%|196M|4.6MB/s|27M|27M|306MB/s|
+|hdiffz sWD p8 lzma2|53.29%|303M|19.8MB/s|27M|27M|350MB/s|
+|hdiffz sWD p1 zstd|53.41%|222M|6.3MB/s|25M|28M|1179MB/s|
+|hdiffz sWD p8 zstd|53.41%|1045M|11.5MB/s|20M|28M|1770MB/s|
+||
 |archive-patcher|31.65%|1448M|0.9MB/s|558M|587M|14MB/s|
 |sfpatcher-1 p1 zstd|31.08%|818M|2.3MB/s|15M|19M|201MB/s|92MB/s|
 |sfpatcher-1 p8 zstd|31.07%|1025M|4.6MB/s|18M|25M|424MB/s|189MB/s|
