@@ -196,6 +196,8 @@ static void printUsage(){
            "      DEFAULT -s-8m; oldPath loaded as Stream;\n"
            "      cacheSize can like 262144 or 256k or 64m or 512m etc....\n"
            "      requires (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires\n"
+           "        (cacheSize+ stepSize+oldWinSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
            "      if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires\n"
            "        (cacheSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
 #if (_IS_NEED_BSDIFF||_IS_NEED_VCDIFF)
@@ -207,11 +209,11 @@ static void printUsage(){
            " hdiffz -VCD,"
 #endif
            " then requires\n"
-           "        (cacheSize + 3*decompress buffer size)+O(1) bytes of memory;\n"
+           "        (cacheSize+ 3*decompress buffer size)+O(1) bytes of memory;\n"
 #endif
 #if (_IS_NEED_VCDIFF)
-           "      if diffFile is created by xdelta3,open-vcdiff, then requires\n"
-           "        (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is created by hdiffz -VCD -w,xdelta3,open-vcdiff, then requires\n"
+           "        (cacheSize+ sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
            "  -m  oldPath all loaded into Memory;\n"
            "      requires (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
@@ -432,7 +434,6 @@ static hpatch_BOOL _toChecksumSet(const char* psets,TPatchChecksumSet* checksumS
 #define kPatchCacheSize_min      (hpatch_kStreamCacheSize*8)
 #define kPatchCacheSize_default  ((size_t)1<<23)
 #define kPatchCacheSize_bestmin  kPatchCacheSize_default
-#define kPatchCacheSize_bettermin (kPatchCacheSize_min*8)
 
 #define _kNULL_VALUE    (-1)
 #define _kNULL_SIZE     (~(size_t)0)
@@ -1146,7 +1147,9 @@ static void _printHDiffInfos(const _THDiffInfos* diffInfos,hpatch_BOOL isInDirDi
 #endif
 #if (_IS_NEED_VCDIFF)
         if (diffInfos->isVcDiff){
-            if (diffInfos->vcdiffInfo.isHDiffzAppHead_a)
+            if (diffInfos->vcdiffInfo.isHDiffzAppHead_window)
+                typeTag="VCDiff (with hdiffz & window tag)";
+            else if (diffInfos->vcdiffInfo.isHDiffzAppHead_a)
                 typeTag="VCDiff (with hdiffz tag)";
             else if (diffInfos->vcdiffInfo.isGoogleVersion)
                 typeTag="VCDiff (with google tag)";
@@ -1432,20 +1435,11 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
             getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,diffInfos.diffInfo.oldDataSize,patchCacheSize,0);
 #if (_IS_NEED_VCDIFF)
             if (diffInfos.isVcDiff){//get vcd patch mem size
-                const hpatch_StreamPos_t maxSrcWindowsSize=diffInfos.vcdiffInfo.maxSrcWindowsSize;
-                hpatch_StreamPos_t _bestMaxCacheSize=maxSrcWindowsSize+diffInfos.vcdiffInfo.maxTargetWindowsSize+kPatchCacheSize_bestmin;
-                if (isLoadOldAll){
-                    betterCacheSize=_bestMaxCacheSize;
-                }else{
-                    betterCacheSize=diffInfos.vcdiffInfo.maxTargetWindowsSize+kPatchCacheSize_bettermin;
-                    if (diffInfos.vcdiffInfo.isHDiffzAppHead_a){
-                        hpatch_StreamPos_t win2Size=diffInfos.vcdiffInfo.maxTargetWindowsSize*2;
-                        betterCacheSize+=_hpatch_pos_min(win2Size,maxSrcWindowsSize);
-                    }else{
-                        betterCacheSize+=maxSrcWindowsSize;
-                    }
-                    betterCacheSize=_hpatch_pos_max(betterCacheSize,patchCacheSize);
-                }
+                hpatch_StreamPos_t stWindowsSize=diffInfos.vcdiffInfo.maxSrcWindowsSize+diffInfos.vcdiffInfo.maxTargetWindowsSize;
+                if (isLoadOldAll)
+                    betterCacheSize=stWindowsSize+kPatchCacheSize_bestmin;
+                else if ((!diffInfos.vcdiffInfo.isHDiffzAppHead_a)||(diffInfos.vcdiffInfo.isHDiffzAppHead_window))// vcd default
+                    betterCacheSize=stWindowsSize+patchCacheSize;
             }
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
@@ -1638,7 +1632,7 @@ int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPa
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
         if (dirDiffInfo->isSingleCompressedDiff){
-            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,dirDiffInfo->hdiffInfo.oldDataSize,
+            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,dirDiffInfo->sdiffInfo.oldDataSize,
                             patchCacheSize,dirDiffInfo->sdiffInfo.stepMemSize);
         }
 #endif

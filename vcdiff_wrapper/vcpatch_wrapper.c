@@ -50,10 +50,12 @@ static const hpatch_byte kVcDiffType[3]={('V'|(1<<7)),('C'|(1<<7)),('D'|(1<<7))}
 #define     kVcDiffMinHeadLen       (sizeof(kVcDiffType)+1+1)
 
 static const char* kHDiffzAppHead="$hdiffz-VCDIFF&";
+static const char* kHDiffzAppHead_window="#w";
 static const char* kHDiffzAppHead_version="#a";
 #define kHDiffzAppHead_len          15 // = strlen(kHDiffzAppHead);
+#define kHDiffzAppHead_window_len   2  // = strlen(kHDiffzAppHead_window);
 #define kHDiffzAppHead_version_len  2  // = strlen(kHDiffzAppHead_version);
-#define kHDiffzAppHead_maxLen       (kHDiffzAppHead_len+kHDiffzAppHead_version_len+hpatch_kMaxPluginTypeLength)
+#define kHDiffzAppHead_maxLen       (kHDiffzAppHead_len+kHDiffzAppHead_window_len+kHDiffzAppHead_version_len+hpatch_kMaxPluginTypeLength)
 
 #define _clip_unpackUInt64(_clip,_result) { \
     if (!_TStreamCacheClip_unpackUIntWithTag(_clip,_result,0)) \
@@ -309,6 +311,7 @@ hpatch_BOOL getVcDiffInfo(hpatch_VcDiffInfo* out_diffinfo,const hpatch_TStreamIn
     }
 #endif
     assert(kHDiffzAppHead_len==strlen(kHDiffzAppHead));
+    assert(kHDiffzAppHead_window_len==strlen(kHDiffzAppHead_window));
     assert(kHDiffzAppHead_version_len==strlen(kHDiffzAppHead_version));
     assert(kHDiffzAppHead_maxLen<=_kWindowCacheSize);
     if ((out_diffinfo->appHeadDataLen>=kHDiffzAppHead_len+kHDiffzAppHead_version_len)
@@ -317,8 +320,11 @@ hpatch_BOOL getVcDiffInfo(hpatch_VcDiffInfo* out_diffinfo,const hpatch_TStreamIn
         if (pAppHead==0)
             return _hpatch_FALSE;
         if ((0==memcmp(pAppHead,kHDiffzAppHead,kHDiffzAppHead_len))
-          &&(0==memcmp(pAppHead+out_diffinfo->appHeadDataLen-kHDiffzAppHead_version_len,kHDiffzAppHead_version,kHDiffzAppHead_version_len)))
+          &&(0==memcmp(pAppHead+out_diffinfo->appHeadDataLen-kHDiffzAppHead_version_len,kHDiffzAppHead_version,kHDiffzAppHead_version_len))){
             out_diffinfo->isHDiffzAppHead_a=hpatch_TRUE;
+            if (0==memcmp(pAppHead+out_diffinfo->appHeadDataLen-(kHDiffzAppHead_version_len+kHDiffzAppHead_window_len),kHDiffzAppHead_window,kHDiffzAppHead_window_len))
+                out_diffinfo->isHDiffzAppHead_window=hpatch_TRUE;
+          }
     }
     if (isNeedWindowSize){
         return _getVcDiffWindowSizes(out_diffinfo,diffStream);
