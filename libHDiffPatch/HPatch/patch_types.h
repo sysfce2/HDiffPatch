@@ -157,6 +157,10 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
 #define _hpatch_align_lower(p,align2pow) _hpatch_align_type_lower(hpatch_size_t,p,align2pow)
 #define _hpatch_align_upper(p,align2pow) _hpatch_align_lower(((hpatch_size_t)(p))+((align2pow)-1),align2pow)
     
+static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_min(hpatch_StreamPos_t a,hpatch_StreamPos_t b){ return (a<b)?a:b; }
+static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t a,hpatch_StreamPos_t b){ return (a>b)?a:b; }
+
+
     typedef void* hpatch_TStreamInputHandle;
     typedef void* hpatch_TStreamOutputHandle;
     

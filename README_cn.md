@@ -421,7 +421,7 @@ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`
 **hsynz p1 zstd** run hsync_make with `-p-1 -c-zstd-21-24`   
 **hsynz p8 zstd** run hsync_make with `-p-8 -c-zstd-21-24` (run `hsync_demo` with `-p-8`)   
    
-update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+2026-06-25 更新: 为 HDiffPatch v5.0.0 的 WinDiff(优化了补丁速度) 添加相关测试   
 `w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
 **hdiffz w p1 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
 **hdiffz w p8 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
@@ -545,7 +545,7 @@ update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch spe
 adding test hpatchz&sfpatcher on Android, arm CPU 麒麟980(2×A76 2.6G + 2×A76 1.92G + 4×A55 1.8G)   
 ( [archive-patcher]、[sfpatcher] diff&patch 时针对apk文件格式进行了优化 )  
    
-update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
+2026-06-25 更新: 为 HDiffPatch v5.0.0 的 WinDiff(优化了补丁速度) 添加相关测试   
 `w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
 
 **测试结果取平均**:
