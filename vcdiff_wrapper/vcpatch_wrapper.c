@@ -306,7 +306,7 @@ hpatch_BOOL getVcDiffInfo(hpatch_VcDiffInfo* out_diffinfo,const hpatch_TStreamIn
 #ifdef __RUN_MEM_SAFE_CHECK
     {
         const hpatch_StreamPos_t maxPos=_TStreamCacheClip_leaveSize(&diffClip);
-        if ( (out_diffinfo->appHeadDataLen>maxPos)||(out_diffinfo->windowOffset>maxPos) )
+        if ( (out_diffinfo->appHeadDataLen>maxPos)||(out_diffinfo->windowOffset>diffStream->streamSize) )
             return _hpatch_FALSE; //data size error
     }
 #endif
