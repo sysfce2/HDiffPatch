@@ -253,22 +253,6 @@ hpatch_BOOL getWindowDiffInfo(hpatch_windowDiffInfo*      out_diffInfo,
                               hpatch_StreamPos_t diffInfo_pos//default 0, begin pos in windowDiff
                               );
 
-typedef enum TWindowPatchResult{
-    kWindowPatch_ok=0,
-    kWindowPatch_load_head_error,
-    kWindowPatch_new_size_error,
-    kWindowPatch_old_size_error,
-    kWindowPatch_onDiffInfo_error,
-    kWindowPatch_temp_mem_error,
-    kWindowPatch_decompress_open_error,
-    kWindowPatch_patch_error,
-    kWindowPatch_checksum_plugin_error,
-    kWindowPatch_checksum_open_error,
-    kWindowPatch_checksum_old_error,
-    kWindowPatch_checksum_new_error,
-    kWindowPatch_checksum_diff_error,
-} TWindowPatchResult;
-
 TWindowPatchResult patch_window_diff(struct winpatch_listener_t*  listener,
                                      const hpatch_TStreamOutput*  out_newData,         //sequential write
                                      const hpatch_TStreamInput*   oldData,             //random read

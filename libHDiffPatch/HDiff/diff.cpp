@@ -1163,9 +1163,9 @@ static void _check_window_onPatchFinish(struct winpatch_listener_t* listener,
     if (temp_cache) free(temp_cache);
 }
 
-int check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
-                      const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
-                      hpatch_TChecksum* checksumPlugin,size_t threadNum){
+TWindowPatchResult check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
+                                     const hpatch_TStreamInput* diffData,hpatch_TDecompress* decompressPlugin,
+                                     hpatch_TChecksum* checksumPlugin,size_t threadNum){
     TWindowCheckImport import;
     import.decompressPlugin=decompressPlugin;
     import.checksumPlugin=checksumPlugin;
@@ -1180,7 +1180,7 @@ int check_window_diff(const hpatch_TStreamInput* newData,const hpatch_TStreamInp
     TAutoMem _cache(kACacheBufSize*1);
     _TCheckOutNewDataStream out_newData(newData,_cache.data(),kACacheBufSize);
 
-    enum TWindowPatchResult result=patch_window_diff(&listener,&out_newData,oldData,diffData,0,threadNum);
+    TWindowPatchResult result=patch_window_diff(&listener,&out_newData,oldData,diffData,0,threadNum);
     if (result==kWindowPatch_ok)
         check(out_newData.isWriteFinish());
     return result;

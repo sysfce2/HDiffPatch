@@ -185,7 +185,7 @@ static void printUsage(){
            "      big cache max used O(oldFileSize) memory, and build slow(diff speed--)\n" 
            "  -w[-oldWinSize-segSize]\n"
            "      diff by window mode; optimize read old data when patch;\n"
-           "        in -m mode, outDiffFile size+, in -s mode, outDiffFile size-- & patch speed-;\n"
+           "        in -m mode, outDiffFile size+, in -s mode, outDiffFile size--;\n"
            "        if oldWinSize+ or segSize-, outDiffFile size-, but diff & patch speed--\n"
            "      oldWinSize: max window bytes on old data, DEFAULT -w-2m;\n"
            "        for big file, recommended -w-4m-128k, -w-16m-256k, etc...\n"

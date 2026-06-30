@@ -54,6 +54,11 @@ apply the delta:
 Tip: `-WD` format supports multi-thread to speed up patching, for example add `-p-5` parameter (multi-thread not recommended on HDD)   
 ## Build it yourself
 ```
+git clone --recurse-submodules https://github.com/sisong/HDiffPatch5.git <code_dir>
+cd <code_dir>
+```
+or
+```
 cd <code_dir>
 git clone https://github.com/sisong/HDiffPatch.git  HDiffPatch
 git clone https://github.com/sisong/libmd5.git  libmd5
@@ -119,7 +124,7 @@ options:
       big cache max used O(oldFileSize) memory, and build slow(diff speed--)
   -w[-oldWinSize-segSize]
       diff by window mode; optimize read old data when patch;
-        in -m mode, outDiffFile size+, in -s mode, outDiffFile size-- & patch speed-;
+        in -m mode, outDiffFile size+, in -s mode, outDiffFile size--;
         if oldWinSize+ or segSize-, outDiffFile size-, but diff & patch speed--
       oldWinSize: max window bytes on old data, DEFAULT -w-2m;
         for big file, recommended -w-4m-128k, -w-16m-256k, etc...
@@ -189,7 +194,6 @@ options:
             support run by multi-thread parallel, fast!
   -C-checksumType
       set outDiffFile Checksum type, for directory diff, DEFAULT -C-fadler64; for -WD, DEFAULT -C-xxh128;
-      (if need checksum for diff between two files, add -D)
       support checksum type:
         -C-no                   no checksum
         -C-crc32
@@ -254,20 +258,26 @@ options:
   -s[-cacheSize]
       DEFAULT -s-8m; oldPath loaded as Stream;
       cacheSize can like 262144 or 256k or 64m or 512m etc....
-      requires (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.
+      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires
+        (cacheSize+ oldWinSize+stepSize + 1*decompress buffer size)+O(1) bytes of memory;
       if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires
         (cacheSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory;
+      if diffFile is compressed diffData(created by hdiffz), then requires
+        (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.
       if diffFile is created by hdiffz -BSD,bsdiff4, hdiffz -VCD, then requires
-        (cacheSize + 3*decompress buffer size)+O(1) bytes of memory;
-      if diffFile is created by xdelta3,open-vcdiff, then requires
-        (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.
+        (cacheSize+ 3*decompress buffer size)+O(1) bytes of memory;
+      if diffFile is created by hdiffz -VCD -w,xdelta3,open-vcdiff, then requires
+        (cacheSize+ sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.
   -m  oldPath all loaded into Memory;
-      requires (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.
+      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires
+        (oldWinSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory;
       if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires
-        (oldFileSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory.
+        (oldFileSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory.
+      if diffFile is compressed diffData(created by hdiffz), then requires
+        (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.
       if diffFile is created by hdiffz -BSD,bsdiff4, then requires
         (oldFileSize + 3*decompress buffer size)+O(1) bytes of memory.
-      if diffFile is VCDIFF(created by hdiffz -VCD,xdelta3,open-vcdiff), then requires
+      if diffFile is VCDIFF(created by hdiffz -VCD,hdiffz -VCD -w,xdelta3,open-vcdiff), then requires
         (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.
   -p-parallelThreadNumber
       if parallelThreadNumber>1 then open multi-thread Parallel mode;
@@ -324,7 +334,7 @@ options:
 * **patch_decompress()**
 * **patch_decompress_with_cache()**
 * **patch_decompress_mem()**
-### v3 API, **diff**&**patch** between directories(folder):
+### v3 API, **diff**&**patch** between directories (HDIFF19):
 * **dir_diff()**
 * **TDirPatcher_\*()** functions with **struct TDirPatcher**
 ### v4 API, single compressed diffData (HDIFFSF20):
@@ -357,13 +367,10 @@ options:
 #### hsynz API, diff&patch by sync (demo [hsynz]): 
 * **create_sync_data()**
 * **create_dir_sync_data()**
-* **sync_patch()**
-* **sync_patch_...()**
-* **sync_local_diff()**
-* **sync_local_diff_...()**
-* **sync_local_patch()**
-* **sync_local_patch_...()**
-* **create_hdiff_by_sign()** (patched by patch_single_stream()...)
+* **sync_patch...()**
+* **sync_local_diff...()**
+* **sync_local_patch...()**
+* **create_hdiff_by_sign()** (patched by patch_single_stream(), scenario like [rsync])
 #### [zsync] wrapper API, (demo [hsynz]): 
 * **create_zsync_data()**
 * **zsync_patch...()**
@@ -398,19 +405,20 @@ case list([download from OneDrive](https://1drv.ms/u/s!Aj8ygMPeifoQgULlawtabR9lh
    
 
 **test PC**: Windows11, CPU R9-7945HX, SSD PCIe4.0x4 4T, DDR5 5200MHz 32Gx2   
-**Program version**: HDiffPatch4.6.3, hsynz 1.1.0, BsDiff4.3, xdelta3.1, zstd1.5.2  
+**Program version**: HDiffPatch5.0.1, hsynz1.1.0, BsDiff4.3, xdelta3.1, zstd1.5.7  
 **test Program**:   
 **zstd --patch-from** diff with `--ultra -21 --long=24 -f --patch-from={old} {new} -o {pat}`   
  zstd patch with `-d -f --memory=2047MB --patch-from={old} {pat} -o {new}`  
 **xdelta3** diff with `-S lzma -e -9 -n -f -s {old} {new} {pat}`   
-**xdelta3** patch with `-d -f -s {old} {pat} {new}`   
-& adding **hpatchz** test: `hpatchz -m -f {old} {xdelta3-pat} {new}`   
+ xdelta3 patch with `-n -d -f -s {old} {pat} {new}`   
+ & adding **hpatchz** test: `hpatchz -f {old} {xdelta3-pat} {new}`   
 **xdelta3 -B** diff with `-S lzma -B {oldSize} -e -9 -n -f -s {old} {new} {pat}`   
-**xdelta3 -B** patch with `-B {oldSize} -d -f -s {old} {pat} {new}`   
-& adding **hpatchz** test: `hpatchz -m -f {old} {xdelta3-B-pat} {new}`   
+xdelta3 -B patch with `-B {oldSize} -d -f -s {old} {pat} {new}`   
+ & adding **hpatchz** test: `hpatchz -f {old} {xdelta3-B-pat} {new}`   
 **bsdiff** diff with `{old} {new} {pat}`   
-**bspatch** patch with `{old} {new} {pat}`   
-& adding **hpatchz** test: `hpatchz -m -f {old} {bsdiff-pat} {new}`   
+ bspatch patch with `{old} {new} {pat}`   
+ & adding **hpatchz** test: `hpatchz -m -f {old} {bsdiff-pat} {new}`   
+ & adding **hpatchz** test: `hpatchz -s -f {old} {bsdiff-pat} {new}`   
 **hdiffz -BSD** diff with `-m-6 -BSD -d -f -p-1 {old} {new} {pat}`   
 **hdiffz zlib** diff with `-m-6 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
 **hdiffz lzma2** diff with `-m-6 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
@@ -418,19 +426,19 @@ case list([download from OneDrive](https://1drv.ms/u/s!Aj8ygMPeifoQgULlawtabR9lh
 **hdiffz s zlib** diff with `-s-64 -SD -d -f -p-1 -c-zlib-9 {old} {new} {pat}`   
 **hdiffz s lzma2** diff with `-s-64 -SD -d -f -p-1 -c-lzma2-9-16m {old} {new} {pat}`   
 **hdiffz s zstd** diff with `-s-64 -SD -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
-& adding all **hdiffz**  test with -p-8   
-**hpatchz** patch with `-s-3m -f {old} {pat} {new}`    
+ & adding all **hdiffz**  test with -p-8   
+ hpatchz patch with `-f {old} {pat} {new}`    
 **hsynz** test, make sync info by `hsync_make -s-2k {new} {out_newi} {out_newz}`,    
-client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`   
+ client sync diff&patch by `hsync_demo {old} {newi} {newz} {out_new} -p-1`   
 **hsynz p1 zlib** run hsync_make with `-p-1 -c-zlib-9`   
 **hsynz p8 zlib** run hsync_make with `-p-8 -c-zlib-9` (run `hsync_demo` with `-p-8`)   
 **hsynz p1 zstd** run hsync_make with `-p-1 -c-zstd-21-24`   
 **hsynz p8 zstd** run hsync_make with `-p-8 -c-zstd-21-24` (run `hsync_demo` with `-p-8`)   
    
-update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
-`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
-**hdiffz w p1 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
-**hdiffz w p8 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+adding test for Window Diff(optimized patch speed)   
+`s` mean diff with `-s-64`, `w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
+**hdiffz sw p1 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-1 {old} {new} {pat}`   
+**hdiffz sw p8 -VCD** diff with `-s-64 -w-2m -VCD-9-8m -d -f -p-8 {old} {new} {pat}`   
 **hdiffz w p8 lzma2** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
 **hdiffz w p8 zstd** diff with `-m-6 -SD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
 **hdiffz sw p8 lzma2** diff with `-s-64 -SD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
@@ -443,8 +451,8 @@ update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch spe
 **hdiffz sWD p8 lzma2** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-lzma2-9-16m {old} {new} {pat}`   
 **hdiffz sWD p1 zstd** diff with `-s-64 -WD -w-2m -d -f -p-1 -c-zstd-21-24 {old} {new} {pat}`   
 **hdiffz sWD p8 zstd** diff with `-s-64 -WD -w-2m -d -f -p-8 -c-zstd-21-24 {old} {new} {pat}`   
- & **hpatchz** patch with `-s-8m -C-no -p-1 -f {old} {pat} {new}` when diff with `-WD -p-1`   
- & **hpatchz** patch with `-s-8m -C-no -p-5 -f {old} {pat} {new}` when diff with `-WD -p-8`   
+ & hpatchz patch with `-C-no -p-1 -f {old} {pat} {new}` when diff with `-WD -p-1`   
+ & hpatchz patch with `-C-no -p-5 -f {old} {pat} {new}` when diff with `-WD -p-8` or `-SD -w-2m -p-8`   
    
 **test result average**:
 |Program|compress|diff mem|speed|patch mem|max mem|speed|
@@ -452,50 +460,51 @@ update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch spe
 |bzip2-9 |33.67%||22.9MB/s|||66MB/s|
 |zlib-9 |36.53%||19.8MB/s|||539MB/s|
 |lzma2-9-16m |25.85%||5.3MB/s|||215MB/s|
-|zstd-21-24 |27.21%||4.2MB/s|||976MB/s|
+|zstd-21-24|27.17%||4.0MB/s|||935MB/s|
 ||
-|zstd --patch-from|7.96%|2798M|3.3MB/s|629M|2303M|828MB/s|
-|xdelta3|13.60%|409M|6.9MB/s|86M|102M|159MB/s|
-|xdelta3 +hpatchz|13.60%|409M|6.9MB/s|70M|82M|377MB/s|
-|xdelta3 -B|9.63%|2282M|10.9MB/s|460M|2070M|267MB/s|
-|xdelta3 -B +hpatchz|9.63%|2282M|10.9MB/s|315M|1100M|477MB/s|
-|hdiffz sw p1 -VCD|9.22%|329M|15.9MB/s|31M|33M|519MB/s|
-|hdiffz sw p8 -VCD|9.22%|506M|48.2MB/s|31M|33M|515MB/s|
-|bsdiff|8.17%|2773M|2.5MB/s|637M|2312M|167MB/s|
-|bsdiff +hpatchz -m|8.17%|2773M|2.5MB/s|321M|1101M|197MB/s|
-|hdiffz p1 -BSD|7.72%|1210M|13.4MB/s|14M|14M|172MB/s|
-|hdiffz p8 -BSD|7.72%|1191M|31.2MB/s|14M|14M|172MB/s|
+|zstd --patch-from|7.57%|2730M|5.5MB/s|629M|2306M|1462MB/s|
+|xdelta3|13.60%|409M|6.7MB/s|85M|102M|154MB/s|
+|xdelta3 +hpatchz|13.60%|409M|6.7MB/s|74M|88M|372MB/s|
+|xdelta3 -B|9.63%|2282M|10.5MB/s|460M|2071M|256MB/s|
+|xdelta3 -B +hpatchz|9.63%|2282M|10.5MB/s|320M|1106M|467MB/s|
+|hdiffz sw p1 -VCD|9.22%|329M|15.9MB/s|34M|36M|526MB/s|
+|hdiffz sw p8 -VCD|9.22%|505M|52.0MB/s|32M|36M|522MB/s|
+|bsdiff|8.17%|2773M|2.5MB/s|637M|2313M|146MB/s|
+|bsdiff +hpatchz -m|8.17%|2773M|2.5MB/s|327M|1107M|188MB/s|
+|bsdiff +hpatchz -s|8.17%|2773M|2.5MB/s|19M|19M|84MB/s|
+|hdiffz p1 -BSD|7.74%|676M|14.3MB/s|19M|19M|164MB/s|
+|hdiffz p8 -BSD|7.73%|662M|33.8MB/s|19M|19M|164MB/s|
 ||
 |hsynz p1 zlib|20.05%|6M|17.3MB/s|6M|22M|273MB/s|
 |hsynz p8 zlib|20.05%|30M|115.1MB/s|13M|29M|435MB/s|
 |hsynz p1 zstd|14.96%|532M|1.9MB/s|24M|34M|264MB/s|
 |hsynz p8 zstd|14.95%|3349M|10.1MB/s|24M|34M|410MB/s|
 ||
-|hdiffz p1 zlib|7.79%|1214M|14.4MB/s|4M|4M|564MB/s|
-|hdiffz p8 zlib|7.79%|1190M|44.8MB/s|4M|4M|559MB/s|
-|hdiffz p1 lzma2|6.44%|1209M|11.4MB/s|16M|20M|431MB/s|
-|hdiffz p8 lzma2|6.44%|1191M|33.4MB/s|16M|20M|428MB/s|
-|hdiffz p1 zstd|6.74%|1211M|11.5MB/s|16M|21M|592MB/s|
-|hdiffz p8 zstd|6.74%|1531M|24.3MB/s|16M|21M|586MB/s|
-|hdiffz w p8 lzma2|6.49%|666M|24.3MB/s|20M|25M|730MB/s|
-|hdiffz w p8 zstd|6.78%|966M|19.2MB/s|20M|26M|1253MB/s|
-|hdiffz WD p1 lzma2|6.52%|679M|7.9MB/s|22M|27M|749MB/s|
-|hdiffz WD p8 lzma2|6.52%|666M|24.8MB/s|22M|27M|1020MB/s|
-|hdiffz WD p1 zstd|6.82%|678M|7.9MB/s|22M|28M|1548MB/s|
-|hdiffz WD p8 zstd|6.82%|971M|19.2MB/s|22M|28M|2527MB/s|
+|hdiffz p1 zlib|7.81%|676M|15.3MB/s|8M|9M|674MB/s|
+|hdiffz p8 zlib|7.80%|663M|50.5MB/s|8M|9M|727MB/s|
+|hdiffz p1 lzma2|6.45%|674M|12.0MB/s|20M|25M|480MB/s|
+|hdiffz p8 lzma2|6.45%|666M|36.2MB/s|21M|25M|525MB/s|
+|hdiffz p1 zstd|6.74%|682M|12.0MB/s|20M|26M|716MB/s|
+|hdiffz p8 zstd|6.74%|1117M|25.3MB/s|20M|26M|752MB/s|
+|hdiffz w p8 lzma2|6.49%|666M|26.5MB/s|20M|25M|761MB/s|
+|hdiffz w p8 zstd|6.78%|965M|20.4MB/s|20M|26M|1326MB/s|
+|hdiffz WD p1 lzma2|6.52%|674M|8.0MB/s|22M|27M|758MB/s|
+|hdiffz WD p8 lzma2|6.52%|665M|26.9MB/s|24M|29M|1027MB/s|
+|hdiffz WD p1 zstd|6.82%|682M|8.0MB/s|22M|28M|1611MB/s|
+|hdiffz WD p8 zstd|6.82%|970M|20.6MB/s|24M|30M|2529MB/s|
 ||
-|hdiffz s p1 zlib|12.52%|91M|46.4MB/s|3M|4M|611MB/s|
-|hdiffz s p8 zlib|12.53%|95M|178.9MB/s|3M|4M|609MB/s|
-|hdiffz s p1 lzma2|9.11%|170M|18.1MB/s|17M|20M|402MB/s|
-|hdiffz s p8 lzma2|9.13%|370M|50.6MB/s|17M|20M|400MB/s|
-|hdiffz s p1 zstd|9.60%|195M|18.0MB/s|17M|21M|677MB/s|
-|hdiffz s p8 zstd|9.60%|976M|28.5MB/s|17M|21M|678MB/s|
-|hdiffz sw p8 lzma2|6.76%|253M|33.7MB/s|20M|25M|584MB/s|
-|hdiffz sw p8 zstd|7.07%|851M|24.9MB/s|20M|26M|873MB/s|
-|hdiffz sWD p1 lzma2|6.80%|177M|13.0MB/s|22M|27M|710MB/s|
-|hdiffz sWD p8 lzma2|6.80%|269M|39.6MB/s|22M|27M|988MB/s|
-|hdiffz sWD p1 zstd|7.12%|211M|13.2MB/s|21M|28M|1449MB/s|
-|hdiffz sWD p8 zstd|7.12%|869M|27.9MB/s|21M|28M|2326MB/s|
+|hdiffz s p1 zlib|12.52%|80M|45.2MB/s|8M|9M|831MB/s|
+|hdiffz s p8 zlib|12.52%|85M|184.1MB/s|8M|9M|828MB/s|
+|hdiffz s p1 lzma2|9.11%|169M|17.8MB/s|22M|25M|474MB/s|
+|hdiffz s p8 lzma2|9.13%|375M|50.1MB/s|22M|25M|474MB/s|
+|hdiffz s p1 zstd|9.58%|195M|17.5MB/s|21M|26M|979MB/s|
+|hdiffz s p8 zstd|9.58%|980M|27.4MB/s|21M|26M|969MB/s|
+|hdiffz sw p8 lzma2|6.76%|252M|36.1MB/s|20M|25M|609MB/s|
+|hdiffz sw p8 zstd|7.07%|851M|26.2MB/s|20M|26M|921MB/s|
+|hdiffz sWD p1 lzma2|6.80%|177M|13.0MB/s|22M|27M|721MB/s|
+|hdiffz sWD p8 lzma2|6.80%|269M|43.2MB/s|23M|29M|987MB/s|
+|hdiffz sWD p1 zstd|7.12%|211M|13.2MB/s|21M|28M|1497MB/s|
+|hdiffz sWD p8 zstd|7.12%|870M|29.8MB/s|23M|30M|2440MB/s|
     
 
 ## input Apk Files for test: 
@@ -537,8 +546,7 @@ case list:
    
 
 **changed test Program**:   
-**hdiffz ...** `-m-6 -SD` changed to `-m-1 -SD-2m -cache`, `-s-64 -SD` changed to `-s-16 -SD-2m`   
-**hdiffz ...** lzma2 dict size `16m` changed to `8m`, zstd dict bit `24` changed to `23`   
+**hdiffz ...** `-m-6` changed to `-m-2 -cache`, `-s-64` changed to `-s-16`   
 **hsynz ...** make `-s-2k` changed to `-s-1k`   
 & adding **hsynz p1**, **hsynz p8** make without compressor   
 **archive-patcher** v1.0, diff with `--generate --old {old} --new {new} --patch {pat}`,   
@@ -548,25 +556,23 @@ case list:
 & **sfpatcher -2 lzma2** diff with `-o-2 -c-lzma2-9-4m -m-1 -step-2m -lp-8m -p-8 -cache -d {old} {new} {pat}`   
  sfpatcher patch with `-lp -p-8 {old} {pat} {new}`   
 **sfpatcher -1 clA zstd** v1.3.0 used `$sf_normalize -cl-A` normalized apks before diff   
-adding test hpatchz&sfpatcher on Android, arm CPU Kirin980(2×A76 2.6G + 2×A76 1.92G + 4×A55 1.8G)   
-( [archive-patcher], [sfpatcher] optimized diff&patch between apk files )  
-   
-update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch speed)   
-`w` mean diff with `-w-2m`, `WD` mean diff with `-WD -w-2m`   
+adding test hpatchz v4.6.9 & sfpatcher on Android, arm CPU Kirin980(2×A76 2.6G + 2×A76 1.92G + 4×A55 1.8G)   
+( [archive-patcher], [sfpatcher] optimized diff&patch between apk files )   
 
 **test result average**:
 |Program|compress|diff mem|speed|patch mem|max mem|speed|arm Kirin980|
 |:----|----:|----:|----:|----:|----:|----:|----:|
-|zstd --patch-from|53.18%|2199M|3.6MB/s|209M|596M|609MB/s|
-|xdelta3|54.51%|422M|3.8MB/s|98M|99M|170MB/s|
-|xdelta3 +hpatchz|54.51%|422M|3.8MB/s|70M|81M|438MB/s|
-|hdiffz sw p1 -VCD|53.73%|288M|9.0MB/s|33M|33M|317MB/s|
-|hdiffz sw p8 -VCD|53.73%|459M|26.2MB/s|33M|33M|318MB/s|
-|bsdiff|53.84%|931M|1.2MB/s|218M|605M|54MB/s|
-|bsdiff +hpatchz -m|53.84%|931M|1.2MB/s|116M|310M|57MB/s|
-|bsdiff +hpatchz -s|53.84%|931M|1.2MB/s|14M|14M|54MB/s|
-|hdiffz p1 -BSD|53.69%|509M|6.8MB/s|14M|14M|55MB/s|
-|hdiffz p8 -BSD|53.70%|514M|15.3MB/s|14M|14M|55MB/s|
+|zstd --patch-from|53.15%|2251M|3.2MB/s|204M|599M|1266MB/s|
+|xdelta3|54.51%|422M|3.8MB/s|97M|100M|162MB/s|
+|xdelta3 +hpatchz|54.51%|422M|3.8MB/s|76M|87M|417MB/s|
+|hdiffz sw p1 -VCD|53.73%|288M|9.6MB/s|36M|36M|325MB/s|
+|hdiffz sw p8 -VCD|53.73%|459M|27.8MB/s|36M|36M|323MB/s|
+|bsdiff|53.84%|931M|1.2MB/s|218M|605M|52MB/s|
+|bsdiff +hpatchz -m|53.84%|931M|1.2MB/s|123M|316M|54MB/s|
+|bsdiff +hpatchz -s|53.84%|931M|1.2MB/s|19M|19M|51MB/s|
+|hdiffz p1 -BSD|53.70%|412M|7.2MB/s|19M|19M|53MB/s|
+|hdiffz p8 -BSD|53.72%|416M|15.5MB/s|19M|19M|53MB/s|
+||
 |hsynz p1|62.43%|4M|1533.5MB/s|4M|10M|236MB/s|
 |hsynz p8|62.43%|18M|2336.4MB/s|12M|18M|394MB/s|
 |hsynz p1 zlib|58.67%|5M|22.7MB/s|4M|11M|243MB/s|
@@ -574,32 +580,31 @@ update 2026-06-25: adding test HDiffPatch v5.0.0 for WinDiff(optimized patch spe
 |hsynz p1 zstd|57.74%|534M|2.7MB/s|24M|28M|234MB/s|
 |hsynz p8 zstd|57.74%|3434M|13.4MB/s|24M|28M|390MB/s|
 ||
-|hdiffz p1|54.40%|509M|8.8MB/s|5M|6M|682MB/s|
-|hdiffz p8|54.41%|514M|32.4MB/s|5M|6M|686MB/s|443MB/s|
-|hdiffz p1 zlib|53.21%|509M|8.2MB/s|5M|6M|514MB/s|
-|hdiffz p8 zlib|53.22%|514M|31.1MB/s|5M|6M|512MB/s|343MB/s|
-|hdiffz p1 lzma2|52.93%|525M|4.1MB/s|21M|22M|260MB/s|
-|hdiffz p8 lzma2|52.94%|557M|18.9MB/s|21M|22M|261MB/s|131MB/s|
-|hdiffz p1 zstd|53.04%|537M|5.4MB/s|21M|22M|598MB/s|
-|hdiffz p8 zstd|53.05%|1251M|11.1MB/s|21M|22M|604MB/s|371MB/s|
-|hdiffz w p8 lzma2|53.25%|389M|8.0MB/s|25M|25M|322MB/s|
-|hdiffz w p8 zstd|53.36%|1042M|6.3MB/s|24M|26M|1098MB/s|
-|hdiffz WD p1 lzma2|53.27%|374M|1.7MB/s|27M|27M|303MB/s|
-|hdiffz WD p8 lzma2|53.27%|390M|8.0MB/s|27M|27M|350MB/s|
-|hdiffz WD p1 zstd|53.38%|384M|1.9MB/s|25M|28M|1171MB/s|
-|hdiffz WD p8 zstd|53.38%|1045M|6.2MB/s|20M|28M|1768MB/s|
-|hdiffz s p1 zlib|53.73%|118M|26.8MB/s|4M|6M|513MB/s|
-|hdiffz s p8 zlib|53.73%|122M|97.3MB/s|4M|6M|513MB/s|
-|hdiffz s p1 lzma2|53.30%|197M|6.4MB/s|20M|22M|258MB/s|
-|hdiffz s p8 lzma2|53.30%|309M|32.4MB/s|20M|22M|258MB/s|
-|hdiffz s p1 zstd|53.44%|221M|10.1MB/s|20M|22M|620MB/s|
-|hdiffz s p8 zstd|53.44%|1048M|14.4MB/s|20M|22M|613MB/s|
-|hdiffz sw p8 lzma2|53.27%|299M|19.3MB/s|25M|25M|319MB/s|
-|hdiffz sw p8 zstd|53.38%|1042M|11.3MB/s|25M|26M|1068MB/s|
-|hdiffz sWD p1 lzma2|53.29%|196M|4.6MB/s|27M|27M|306MB/s|
-|hdiffz sWD p8 lzma2|53.29%|303M|19.8MB/s|27M|27M|350MB/s|
-|hdiffz sWD p1 zstd|53.41%|222M|6.3MB/s|25M|28M|1179MB/s|
-|hdiffz sWD p8 zstd|53.41%|1045M|11.5MB/s|20M|28M|1770MB/s|
+|hdiffz p1 zlib|53.22%|412M|8.8MB/s|10M|11M|827MB/s|343MB/s|
+|hdiffz p8 zlib|53.23%|415M|32.6MB/s|10M|11M|916MB/s|
+|hdiffz p1 lzma2|52.92%|429M|4.3MB/s|26M|27M|310MB/s|131MB/s|
+|hdiffz p8 lzma2|52.94%|464M|19.4MB/s|26M|27M|327MB/s|
+|hdiffz p1 zstd|53.04%|442M|5.7MB/s|25M|27M|1072MB/s|371MB/s|
+|hdiffz p8 zstd|53.05%|1164M|11.2MB/s|25M|28M|1104MB/s|
+|hdiffz w p8 lzma2|53.24%|426M|14.4MB/s|26M|27M|322MB/s|
+|hdiffz w p8 zstd|53.35%|1044M|9.3MB/s|24M|28M|1135MB/s|
+|hdiffz WD p1 lzma2|53.27%|417M|3.2MB/s|27M|27M|312MB/s|
+|hdiffz WD p8 lzma2|53.27%|426M|14.6MB/s|29M|29M|353MB/s|
+|hdiffz WD p1 zstd|53.38%|425M|3.9MB/s|25M|28M|1266MB/s|
+|hdiffz WD p8 zstd|53.38%|1045M|9.4MB/s|22M|30M|1877MB/s|
+||
+|hdiffz s p1 zlib|53.73%|100M|27.0MB/s|9M|11M|780MB/s|
+|hdiffz s p8 zlib|53.73%|104M|97.1MB/s|9M|11M|885MB/s|
+|hdiffz s p1 lzma2|53.30%|193M|6.5MB/s|25M|27M|296MB/s|
+|hdiffz s p8 lzma2|53.30%|312M|32.4MB/s|25M|27M|317MB/s|
+|hdiffz s p1 zstd|53.44%|218M|10.3MB/s|24M|27M|1021MB/s|
+|hdiffz s p8 zstd|53.44%|1049M|14.3MB/s|23M|28M|1091MB/s|
+|hdiffz sw p8 lzma2|53.26%|302M|22.4MB/s|26M|27M|322MB/s|
+|hdiffz sw p8 zstd|53.37%|1044M|12.1MB/s|25M|28M|1086MB/s|
+|hdiffz sWD p1 lzma2|53.29%|196M|4.7MB/s|27M|27M|315MB/s|
+|hdiffz sWD p8 lzma2|53.29%|303M|23.1MB/s|29M|29M|352MB/s|
+|hdiffz sWD p1 zstd|53.41%|222M|6.5MB/s|25M|28M|1281MB/s|
+|hdiffz sWD p8 zstd|53.41%|1045M|12.2MB/s|21M|30M|1874MB/s|
 ||
 |archive-patcher|31.65%|1448M|0.9MB/s|558M|587M|14MB/s|
 |sfpatcher-1 p1 zstd|31.08%|818M|2.3MB/s|15M|19M|201MB/s|92MB/s|

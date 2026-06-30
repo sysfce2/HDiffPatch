@@ -3161,7 +3161,7 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
     unsigned char*           temp_cache_back=0;
     unsigned char*           temp_cache=0;
     unsigned char*           temp_cacheEnd=0;
-    hpatch_BOOL              isChecksumNew=hpatch_TRUE;
+    hpatch_BOOL              isChecksumNew;
     hpatch_BOOL              isChecksumOld=hpatch_FALSE;
     hpatch_BOOL              isChecksumDiff=hpatch_FALSE;
     hpatch_checksumHandle    checksumHandle_old=0;
@@ -3191,6 +3191,7 @@ TWindowPatchResult patch_window_diff(winpatch_listener_t* listener,
         return kWindowPatch_new_size_error;
     out_newData->streamSize=diffInfo.newDataSize;//adjust output stream size
 
+    isChecksumNew=(diffInfo.checksumByteSize>0);
     if (!listener->onDiffInfo(listener,&diffInfo,&decompressPlugin,&checksumPlugin,
                               &isChecksumNew,&isChecksumOld,&isChecksumDiff,&temp_cache,&temp_cacheEnd))
         return kWindowPatch_onDiffInfo_error;

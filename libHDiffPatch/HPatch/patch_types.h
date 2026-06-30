@@ -376,10 +376,10 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
         hpatch_StreamPos_t  maxStepMemSize;
         hpatch_StreamPos_t  maxSubCoverCount;
         hpatch_StreamPos_t  maxWindowOldSize;
-        hpatch_StreamPos_t  checksumByteSize;      //0=no checksum
+        hpatch_StreamPos_t  checksumByteSize;      //0 no checksum
         hpatch_StreamPos_t  extraDataSize;
         hpatch_StreamPos_t  uncompressedSize;      //windowDiffStreamSize
-        hpatch_StreamPos_t  compressedSize;        //0=uncompressed, >0=compressed
+        hpatch_StreamPos_t  compressedSize;        //0 uncompressed, >0 compressed
         hpatch_StreamPos_t  otherInfoPos;
         hpatch_StreamPos_t  otherInfoEndPos;
         hpatch_StreamPos_t  windowDataPos;         //window data begin pos; old,new,diff's checksum begin pos=windowDataPos-3*checksumByteSize
@@ -388,6 +388,22 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
         char                checksumType[hpatch_kMaxPluginTypeLength+1];
     } hpatch_windowDiffInfo;
     
+    typedef enum TWindowPatchResult{
+        kWindowPatch_ok=0,
+        kWindowPatch_load_head_error,
+        kWindowPatch_new_size_error,
+        kWindowPatch_old_size_error,
+        kWindowPatch_onDiffInfo_error,
+        kWindowPatch_temp_mem_error,
+        kWindowPatch_decompress_open_error,
+        kWindowPatch_patch_error,
+        kWindowPatch_checksum_plugin_error,
+        kWindowPatch_checksum_open_error,
+        kWindowPatch_checksum_old_error,
+        kWindowPatch_checksum_new_error,
+        kWindowPatch_checksum_diff_error,
+    } TWindowPatchResult;
+
     hpatch_inline static void _winDiffInfoToHDiffInfo(hpatch_compressedDiffInfo* out_diffInfo,const hpatch_windowDiffInfo* winDiffInfo){
         out_diffInfo->newDataSize=winDiffInfo->newDataSize;
         out_diffInfo->oldDataSize=winDiffInfo->oldDataSize;
@@ -402,10 +418,10 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
                                   const hpatch_windowDiffInfo* info,
                                   hpatch_TDecompress** out_decompressPlugin,//find decompressPlugin by info->compressType
                                   struct hpatch_TChecksum** out_checksumPlugin, //find checksumPlugin by info->checksumType
-                                  hpatch_BOOL* isChecksumNew,   // *isChecksumNew default true when have info->checksumType
-                                  hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff, 
+                                  hpatch_BOOL* isChecksumNew,   // *isChecksumNew default true when info->checksumByteSize>0
+                                  hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff,//*isChecksumOld & *isChecksumDiff default false
                                   unsigned char** out_temp_cache,    //*out_temp_cacheEnd-*out_temp_cache == info->maxWindowOldSize + info->stepMemSize + (I/O cache memory)
-                                  unsigned char** out_temp_cacheEnd);//  note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
+                                  unsigned char** out_temp_cacheEnd);//    note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
         void        (*onPatchFinish)(struct winpatch_listener_t* listener, //onPatchFinish can null
                                      unsigned char* temp_cache, unsigned char* temp_cacheEnd);
     } winpatch_listener_t;

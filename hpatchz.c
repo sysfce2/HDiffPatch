@@ -195,11 +195,12 @@ static void printUsage(){
            "  -s[-cacheSize] \n"
            "      DEFAULT -s-8m; oldPath loaded as Stream;\n"
            "      cacheSize can like 262144 or 256k or 64m or 512m etc....\n"
-           "      requires (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
            "      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires\n"
-           "        (cacheSize+ stepSize+oldWinSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
+           "        (cacheSize+ oldWinSize+stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
            "      if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires\n"
            "        (cacheSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
+           "      if diffFile is compressed diffData(created by hdiffz), then requires\n"
+           "        (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
 #if (_IS_NEED_BSDIFF||_IS_NEED_VCDIFF)
            "      if diffFile is created by"
 #if (_IS_NEED_BSDIFF)
@@ -216,15 +217,18 @@ static void printUsage(){
            "        (cacheSize+ sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
            "  -m  oldPath all loaded into Memory;\n"
-           "      requires (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires\n"
+           "        (oldWinSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
            "      if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires\n"
-           "        (oldFileSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory.\n"
+           "        (oldFileSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is compressed diffData(created by hdiffz), then requires\n"
+           "        (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
 #if (_IS_NEED_BSDIFF)
            "      if diffFile is created by hdiffz -BSD,bsdiff4, then requires\n"
            "        (oldFileSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
 #if (_IS_NEED_VCDIFF)
-           "      if diffFile is VCDIFF(created by hdiffz -VCD,xdelta3,open-vcdiff), then requires\n"
+           "      if diffFile is VCDIFF(created by hdiffz -VCD,hdiffz -VCD -w,xdelta3,open-vcdiff), then requires\n"
            "        (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
 #if (_IS_USED_MULTITHREAD)
@@ -1432,7 +1436,7 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
 #endif
         { //alloc mem
             hpatch_StreamPos_t minCacheSize,betterCacheSize;
-            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,diffInfos.diffInfo.oldDataSize,patchCacheSize,0);
+            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,poldData->streamSize,patchCacheSize,0);
 #if (_IS_NEED_VCDIFF)
             if (diffInfos.isVcDiff){//get vcd patch mem size
                 hpatch_StreamPos_t stWindowsSize=diffInfos.vcdiffInfo.maxSrcWindowsSize+diffInfos.vcdiffInfo.maxTargetWindowsSize;
@@ -1444,7 +1448,7 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
             if (diffInfos.isSingleCompressedDiff){
-                getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,diffInfos.diffInfo.oldDataSize,
+                getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,poldData->streamSize,
                                 patchCacheSize,diffInfos.sdiffInfo.stepMemSize);
             }
 #endif
