@@ -75,6 +75,12 @@ enum TDiffType{
 
 static const hpatch_byte g_testControl[kDiffTypeCount]={ 1, 1,1, 1,1, 1,1, 1, 1, 1,1, 1,1 };
 //static const hpatch_byte g_testControl[kDiffTypeCount]={ 0, 0,0, 0,0, 0,0, 0, 0, 0,0, 0,0 };
+#ifndef _IS_NEED_BSDIFF
+#   define _IS_NEED_BSDIFF 1
+#endif
+#ifndef _IS_NEED_VCDIFF
+#   define _IS_NEED_VCDIFF 1
+#endif
 
 //===== select compress plugin =====
 #define _CompressPlugin_no
@@ -602,6 +608,7 @@ long _attackPacth(TByte* out_newData,TByte* out_newData_end,
             mem_as_hStreamInput(&diffStream,diffData,diffData_end);
             patch_window_diff(&listener,&out_newStream,&oldStream,&diffStream,0,patch_threadNum);
         } break;
+#if (_IS_NEED_VCDIFF)
         case kDiffV: case kDiffVs: {
             struct hpatch_TStreamOutput out_newStream;
             struct hpatch_TStreamInput  oldStream;
@@ -612,6 +619,8 @@ long _attackPacth(TByte* out_newData,TByte* out_newData_end,
             vcpatch_with_cache(&out_newStream,&oldStream,&diffStream,decompressPlugin,hpatch_FALSE,
                                 _temp_cache.data(),_temp_cache.data()+_temp_cache.size());
         } break;
+#endif
+#if (_IS_NEED_BSDIFF)
         case kDiffB: case kDiffBs: {
             struct hpatch_TStreamOutput out_newStream;
             struct hpatch_TStreamInput  oldStream;
@@ -622,6 +631,7 @@ long _attackPacth(TByte* out_newData,TByte* out_newData_end,
             bspatch_with_cache(&out_newStream,&oldStream,&diffStream,decompressPlugin,
                                 _temp_cache.data(),_temp_cache.data()+_temp_cache.size());
         } break;
+#endif
     }
     return 0;
 }
@@ -850,6 +860,7 @@ long test(const TByte* newData,const TByte* newData_end,
 #endif
         }
     }
+#if (_IS_NEED_VCDIFF)
     if (g_testControl[kDiffV]){//test vcdiff
         std::vector<TByte> diffData;
         TVectorAsStreamOutput out_diffStream(diffData);
@@ -891,6 +902,8 @@ long test(const TByte* newData,const TByte* newData_end,
 #endif
         }
     }
+#endif //_IS_NEED_VCDIFF
+#if (_IS_NEED_BSDIFF)
     if (g_testControl[kDiffB]){//test bsdiff
         std::vector<TByte> diffData;
         TVectorAsStreamOutput out_diffStream(diffData);
@@ -949,6 +962,7 @@ long test(const TByte* newData,const TByte* newData_end,
 #endif
         }
     }
+#endif //_IS_NEED_BSDIFF
     printf("\n");
     return result;
 }
