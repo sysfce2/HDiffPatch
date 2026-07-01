@@ -237,6 +237,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\bsdiff_wrapper\bsdiff_wrapper.cpp" />
+    <ClCompile Include="..\..\bsdiff_wrapper\bspatch_wrapper.c" />
     <ClCompile Include="..\..\dirDiffPatch\dir_diff\dir_diff_tools.cpp" />
     <ClCompile Include="..\..\dirDiffPatch\dir_patch\dir_patch_tools.c" />
     <ClCompile Include="..\..\dirDiffPatch\dir_patch\ref_stream.c" />
@@ -276,6 +278,8 @@
     <ClCompile Include="..\..\libParallel\parallel_channel.cpp" />
     <ClCompile Include="..\..\libParallel\parallel_import_c.c" />
     <ClCompile Include="..\..\test\unit_test.cpp" />
+    <ClCompile Include="..\..\vcdiff_wrapper\vcdiff_wrapper.cpp" />
+    <ClCompile Include="..\..\vcdiff_wrapper\vcpatch_wrapper.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\libHDiffPatch\HPatch\patch.h" />

@@ -39,13 +39,19 @@ static const hpatch_byte kVcDiffType[3]={('V'|(1<<7)),('C'|(1<<7)),('D'|(1<<7))}
 #define kVcDiffVersion 0
 
 static const char* kHDiffzAppHead="$hdiffz-VCDIFF&";
+static const char* kHDiffzAppHead_window="#w";
 static const char* kHDiffzAppHead_version="#a";
+#define kHDiffzAppHead_maxLen  (15+2+(256+4-1)) //fixed for compatible first version
 
-static std::string getHDiffzAppHead(const vcdiff_TCompress* compressPlugin){
+static std::string getHDiffzAppHead(const vcdiff_TCompress* compressPlugin,bool isOutWindowTag){
     std::string str(kHDiffzAppHead);
     if (compressPlugin&&compressPlugin->compress)
         str+=compressPlugin->compress->compressType();
-    return str+kHDiffzAppHead_version;
+    if (isOutWindowTag)
+        str+=kHDiffzAppHead_window;
+    str+=kHDiffzAppHead_version;
+    _check(str.size()<=kHDiffzAppHead_maxLen,"appHead too long!");
+    return str;
 }
 
 namespace hdiff_private{
@@ -444,7 +450,7 @@ static void _writeVcdiffWindowDelta(TDiffStream& outDiff,std::vector<hpatch_byte
 static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hpatch_TStreamInput* oldData,
                                      const TInputCovers& covers,const std::vector<hpatch_TWindow>& matchWindows,
                                      const hpatch_TStreamOutput* out_diff,const vcdiff_TCompress* compressPlugin,
-                                     size_t kMaxTargetWindowsSize,size_t kMaxSrcWindowsSize=~(size_t)0){
+                                     size_t kMaxTargetWindowsSize,size_t kMaxSrcWindowsSize=~(size_t)0,bool isOutWindowTag=false){
     _out_diff_info("  serialize VCDIFF diffData ...\n");
     std::vector<hpatch_byte> buf;
     TDiffStream outDiff(out_diff);
@@ -461,7 +467,7 @@ static void serialize_vcdiff_windows(const hpatch_TStreamInput* newData,const hp
         if (isHaveCompresser)//VCD_DECOMPRESS
             buf.push_back(compressPlugin->compress_type);
         { //VCD_APPHEADER   // add HDiffzAppHead tag to out_diff
-            const std::string HDiffzAppHead=getHDiffzAppHead(compressPlugin);
+            const std::string HDiffzAppHead=getHDiffzAppHead(compressPlugin,isOutWindowTag);
             packUInt(buf,HDiffzAppHead.size());
             pushCStr(buf,HDiffzAppHead.c_str());
         }
@@ -660,11 +666,13 @@ void create_vcdiff_window(const hpatch_TStreamInput* newData,const hpatch_TStrea
     std::vector<hpatch_TWindow> windows;
     const bool isExtendCover=false;
     const bool isCollateMergeCover=false;
+    const bool isOutWindowTag=true;
     get_match_covers_and_window(newData,oldData,kNewWindowSize,kOldWindowSize,kSegSize,
                                 isCollateMergeCover,covers,windows,
                                 kBigCoverSize,kMatchBlockSize,fastMatchBlockSize,kMinSingleMatchScore,
                                 isUseBigCacheMatch,mtsets,isExtendCover);
-    serialize_vcdiff_windows(newData,oldData,covers,windows,out_diff,compressPlugin,kNewWindowSize,kOldWindowSize);
+    serialize_vcdiff_windows(newData,oldData,covers,windows,out_diff,compressPlugin,
+                             kNewWindowSize,kOldWindowSize,isOutWindowTag);
 }
 
 

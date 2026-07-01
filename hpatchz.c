@@ -142,7 +142,7 @@
 #if (_IS_NEED_DEFAULT_ChecksumPlugin)
 //===== select needs checksum plugins or change to your plugin=====
 #   define _ChecksumPlugin_crc32    //    32 bit effective  //need zlib
-#   define _ChecksumPlugin_fadler64 // ?  63 bit effective
+#   define _ChecksumPlugin_fadler64 // ?  61 bit effective
 #   define _ChecksumPlugin_md5      //   128 bit
 #   define _ChecksumPlugin_xxh3     //    64 bit fast
 #   define _ChecksumPlugin_xxh128   //   128 bit fast
@@ -183,6 +183,7 @@ static void printUsage(){
     printVersion();
     printf("\n");
     printf("patch usage: hpatchz [options] oldPath diffFile outNewPath\n"
+           "uncompress usage: hpatchz [options] \"\" diffFile outNewPath\n"   
            "print  info: hpatchz -info diffFile\n"
 #if (_IS_NEED_SFX)
            "create  SFX: hpatchz [-X-exe#selfExecuteFile] diffFile -X#outSelfExtractArchive\n"
@@ -195,9 +196,12 @@ static void printUsage(){
            "  -s[-cacheSize] \n"
            "      DEFAULT -s-8m; oldPath loaded as Stream;\n"
            "      cacheSize can like 262144 or 256k or 64m or 512m etc....\n"
-           "      requires (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires\n"
+           "        (cacheSize+ oldWinSize+stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
            "      if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires\n"
            "        (cacheSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
+           "      if diffFile is compressed diffData(created by hdiffz), then requires\n"
+           "        (cacheSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
 #if (_IS_NEED_BSDIFF||_IS_NEED_VCDIFF)
            "      if diffFile is created by"
 #if (_IS_NEED_BSDIFF)
@@ -207,47 +211,43 @@ static void printUsage(){
            " hdiffz -VCD,"
 #endif
            " then requires\n"
-           "        (cacheSize + 3*decompress buffer size)+O(1) bytes of memory;\n"
+           "        (cacheSize+ 3*decompress buffer size)+O(1) bytes of memory;\n"
 #endif
 #if (_IS_NEED_VCDIFF)
-           "      if diffFile is created by xdelta3,open-vcdiff, then requires\n"
-           "        (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is created by hdiffz -VCD -w,xdelta3,open-vcdiff, then requires\n"
+           "        (cacheSize+ sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
            "  -m  oldPath all loaded into Memory;\n"
-           "      requires (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is window diffData(created by hdiffz -WD-stepSize -w-oldWinSize), then requires\n"
+           "        (oldWinSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory;\n"
            "      if diffFile is single compressed diffData(created by hdiffz -SD-stepSize), then requires\n"
-           "        (oldFileSize+ stepSize + 1*decompress buffer size)+O(1) bytes of memory.\n"
+           "        (oldFileSize + stepSize + 1*decompress buffer size)+O(1) bytes of memory.\n"
+           "      if diffFile is compressed diffData(created by hdiffz), then requires\n"
+           "        (oldFileSize + 4*decompress buffer size)+O(1) bytes of memory.\n"
 #if (_IS_NEED_BSDIFF)
            "      if diffFile is created by hdiffz -BSD,bsdiff4, then requires\n"
            "        (oldFileSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
 #if (_IS_NEED_VCDIFF)
-           "      if diffFile is VCDIFF(created by hdiffz -VCD,xdelta3,open-vcdiff), then requires\n"
+           "      if diffFile is VCDIFF(created by hdiffz -VCD,hdiffz -VCD -w,xdelta3,open-vcdiff), then requires\n"
            "        (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.\n"
 #endif
 #if (_IS_USED_MULTITHREAD)
            "  -p-parallelThreadNumber\n"
            "      if parallelThreadNumber>1 then open multi-thread Parallel mode;\n"
-           "      now only support single compressed diffData(created by hdiffz -SD-stepSize);\n"
+           "      now support window diffData(created by hdiffz -WD) and single compressed diffData(created by hdiffz -SD);\n"
            "      can set 1..5, DEFAULT -p-1!\n"
 #endif
 #if ((_IS_NEED_DIR_DIFF_PATCH)||(_IS_NEED_VCDIFF)||(_IS_NEED_WINDOW_DIFF))
            "  -C-checksumSets\n"
-           "      set Checksum data for window patch & directory patch & VCDIFF patch, DEFAULT -C-new"
-  #if (_IS_NEED_DIR_DIFF_PATCH)
-           "-copy"
-  #endif
-           ";\n      checksumSets support (can choose multiple):\n"
+           "      set Checksum data for window patch & directory patch & VCDIFF patch, DEFAULT -C-new-copy;\n"
+           "      checksumSets support (can choose multiple):\n"
            "        -C-no           no checksum;\n"
            "        -C-new          checksum new files edited from old reference files;\n"
            "        -C-diff         checksum diffFile; (VCDIFF unsupport)\n"
            "        -C-old          checksum old reference files; (VCDIFF unsupport)\n"
-  #if (_IS_NEED_DIR_DIFF_PATCH)
            "        -C-copy         checksum new files copy from old same files, for directory patch;\n"
            "        -C-all          same as: -C-new-copy-diff-old;\n"
-  #else
-           "        -C-all          same as: -C-new-diff-old;\n"
-  #endif
 #endif
 #if (_IS_NEED_DIR_DIFF_PATCH)
            "  -n-maxOpenFileNumber\n"
@@ -353,17 +353,17 @@ typedef enum THPatchResult {
 #endif
 
 int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFileName,
-           hpatch_BOOL isLoadOldAll,size_t patchCacheSize,hpatch_StreamPos_t diffDataOffert,
+           hpatch_BOOL isLoadOldAll,size_t patchCacheSize,hpatch_StreamPos_t diffDataOffset,
            hpatch_StreamPos_t diffDataSize,TPatchChecksumSet* checksumSet,size_t threadNum);
 #if (_IS_NEED_DIR_DIFF_PATCH)
 int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPath,
                hpatch_BOOL isLoadOldAll,size_t patchCacheSize,size_t kMaxOpenFileNumber,
                TPatchChecksumSet* checksumSet,IHPatchDirListener* hlistener,
-               hpatch_StreamPos_t diffDataOffert,hpatch_StreamPos_t diffDataSize,size_t threadNum);
+               hpatch_StreamPos_t diffDataOffset,hpatch_StreamPos_t diffDataSize,size_t threadNum);
 #endif
 #if (_IS_NEED_SFX)
 int createSfx(const char* selfExecuteFileName,const char* diffFileName,const char* out_sfxFileName);
-hpatch_BOOL getDiffDataOffertInSfx(hpatch_StreamPos_t* out_diffDataOffert,hpatch_StreamPos_t* out_diffDataSize);
+hpatch_BOOL getDiffDataOffertInSfx(hpatch_StreamPos_t* out_diffDataOffset,hpatch_StreamPos_t* out_diffDataSize);
 #endif
 
 #if (_IS_NEED_MAIN)
@@ -437,7 +437,7 @@ static hpatch_BOOL _toChecksumSet(const char* psets,TPatchChecksumSet* checksumS
 #define _kNULL_SIZE     (~(size_t)0)
 
 #define _THREAD_NUMBER_NULL     _kNULL_SIZE
-#define _THREAD_NUMBER_DEFUALT  1
+#define _THREAD_NUMBER_DEFAULT  1
 #define _THREAD_NUMBER_MAX      5
 
 #if (_IS_NEED_CMDLINE)
@@ -513,6 +513,7 @@ int hpatch_cmd_line(int argc, const char * argv[]){
                 if (op[2]=='-'){
                     const char* pnum=op+3;
                     _options_check(kmg_to_size(pnum,strlen(pnum),&patchCacheSize),"-s-?");
+                    patchCacheSize=_hpatch_pos_max(patchCacheSize,kPatchCacheSize_min);
                 }else{
                     patchCacheSize=kPatchCacheSize_default;
                 }
@@ -596,16 +597,18 @@ int hpatch_cmd_line(int argc, const char * argv[]){
     if (isRunSFX==_kNULL_VALUE)
         isRunSFX=hpatch_FALSE;
     if (threadNum==_THREAD_NUMBER_NULL)
-        threadNum=_THREAD_NUMBER_DEFUALT;
+        threadNum=_THREAD_NUMBER_DEFAULT;
+    if (threadNum>_THREAD_NUMBER_MAX)
+        threadNum=_THREAD_NUMBER_MAX;
 #if (_IS_NEED_MAIN && _IS_USED_MULTITHREAD)
     if (threadNum>1)
         _parallel_import_c_on_error=_on_mt_error;
 #endif
 #if (_IS_NEED_SFX)
     if ((argc<=1)&&(!isRunSFX)){
-        hpatch_StreamPos_t _diffDataOffert=0;
+        hpatch_StreamPos_t _diffDataOffset=0;
         hpatch_StreamPos_t _diffDataSize=0;
-        if (getDiffDataOffertInSfx(&_diffDataOffert,&_diffDataSize)){//autoExtractSFX
+        if (getDiffDataOffertInSfx(&_diffDataOffset,&_diffDataSize)){//autoExtractSFX
             isForceOverwrite=hpatch_TRUE;
             isRunSFX=hpatch_TRUE;
         }
@@ -681,12 +684,12 @@ int hpatch_cmd_line(int argc, const char * argv[]){
         hpatch_BOOL  isOutDir;
 #endif
         hpatch_BOOL  isSamePath;
-        hpatch_StreamPos_t diffDataOffert=0;
+        hpatch_StreamPos_t diffDataOffset=0;
         hpatch_StreamPos_t diffDataSize=0;
 #if (_IS_NEED_SFX)
         if (isRunSFX){
             printf("run as SFX mode!\n");
-            _return_check(getDiffDataOffertInSfx(&diffDataOffert,&diffDataSize),
+            _return_check(getDiffDataOffertInSfx(&diffDataOffset,&diffDataSize),
                           HPATCH_RUN_SFX_NOTSFX_ERROR,"not found diff data in selfExecuteFile");
             diffFileName=argv[0];//selfExecuteFileName
             if (arg_values_size==0){//autoExtractSFX
@@ -718,7 +721,7 @@ int hpatch_cmd_line(int argc, const char * argv[]){
                           HPATCH_PATHTYPE_ERROR,"outNewPath already exists, overwrite");
         }
 #if (_IS_NEED_DIR_DIFF_PATCH)
-        _return_check(getDirDiffInfoByFile(&dirDiffInfo,diffFileName,diffDataOffert,diffDataSize),
+        _return_check(getDirDiffInfoByFile(&dirDiffInfo,diffFileName,diffDataOffset,diffDataSize),
                       HPATCH_OPENREAD_ERROR,"input diffFile open read");
         isOutDir=(dirDiffInfo.isDirDiff)&&(dirDiffInfo.newPathIsDir);
         #if (_IS_NEED_SFX)
@@ -733,12 +736,12 @@ int hpatch_cmd_line(int argc, const char * argv[]){
 #if (_IS_NEED_DIR_DIFF_PATCH)
             if (dirDiffInfo.isDirDiff){
                 return hpatch_dir(oldPath,diffFileName,outNewPath,isLoadOldAll,patchCacheSize,kMaxOpenFileNumber,
-                                  &checksumSet,&defaultPatchDirlistener,diffDataOffert,diffDataSize,threadNum);
+                                  &checksumSet,&defaultPatchDirlistener,diffDataOffset,diffDataSize,threadNum);
             }else
 #endif
             {
                 return hpatch(oldPath,diffFileName,outNewPath,isLoadOldAll,patchCacheSize,
-                              diffDataOffert,diffDataSize,&checksumSet,threadNum);
+                              diffDataOffset,diffDataSize,&checksumSet,threadNum);
             }
         }else
 #if (_IS_NEED_DIR_DIFF_PATCH)
@@ -762,12 +765,12 @@ int hpatch_cmd_line(int argc, const char * argv[]){
             if (dirDiffInfo.isDirDiff){
                 result=hpatch_dir(oldPath,diffFileName,newTempName,isLoadOldAll,patchCacheSize,
                                   kMaxOpenFileNumber,&checksumSet,&defaultPatchDirlistener,
-                                  diffDataOffert,diffDataSize,threadNum);
+                                  diffDataOffset,diffDataSize,threadNum);
             }else
 #endif
             {
                 result=hpatch(oldPath,diffFileName,newTempName,isLoadOldAll,patchCacheSize,
-                              diffDataOffert,diffDataSize,&checksumSet,threadNum);
+                              diffDataOffset,diffDataSize,&checksumSet,threadNum);
             }
             if (result==HPATCH_SUCCESS){
                 _return_check(hpatch_removeFile(oldPath),
@@ -794,7 +797,7 @@ int hpatch_cmd_line(int argc, const char * argv[]){
                           HPATCH_TEMPPATH_ERROR,"getTempPathName(outNewPath)");
             printf("NOTE: all in outNewPath temp directory will be move to oldDirectory after patch!\n");
             result=hpatch_dir(oldPath,diffFileName,newTempDir,isLoadOldAll,patchCacheSize,kMaxOpenFileNumber,
-                              &checksumSet,&tempDirPatchListener,diffDataOffert,diffDataSize,threadNum);
+                              &checksumSet,&tempDirPatchListener,diffDataOffset,diffDataSize,threadNum);
             if (result==HPATCH_SUCCESS){
                 printf("all in outNewPath temp directory moved to oldDirectory!\n");
             }else if(!hpatch_isPathNotExist(newTempDir)){
@@ -968,9 +971,29 @@ static hpatch_BOOL findChecksum(hpatch_TChecksum** out_checksumPlugin,const char
 }
 #endif
 
+    static TByte* allocPatchMemCache(hpatch_StreamPos_t kMinCacheSize,hpatch_StreamPos_t betterCacheSize,hpatch_size_t* out_memCacheSize);
+    static hpatch_inline void getPatchMemSize(hpatch_StreamPos_t* out_minCacheSize,hpatch_StreamPos_t* out_betterCacheSize,
+                                              hpatch_BOOL isLoadOldAll,hpatch_StreamPos_t oldDataSize,
+                                              hpatch_StreamPos_t patchCacheSize,hpatch_StreamPos_t mustAppedSize){
+        *out_minCacheSize=mustAppedSize+kPatchCacheSize_min;
+        if (isLoadOldAll)
+            *out_betterCacheSize=oldDataSize+mustAppedSize+kPatchCacheSize_bestmin;
+        else
+            *out_betterCacheSize=mustAppedSize+patchCacheSize;
+    }
+
 #if (_IS_NEED_WINDOW_DIFF)
+    static void getWinPatchMemSize(hpatch_StreamPos_t* out_minCacheSize,hpatch_StreamPos_t* out_betterCacheSize,
+                                   hpatch_BOOL isLoadOldAll,hpatch_StreamPos_t oldDataSize,hpatch_StreamPos_t patchCacheSize,
+                                   hpatch_StreamPos_t maxWindowOldSize,hpatch_StreamPos_t maxStepMemSize,size_t threadNum){
+        hpatch_StreamPos_t betterOldSize=_hpatch_pos_min(maxWindowOldSize*((threadNum>1)?2:1),oldDataSize);
+        *out_minCacheSize=maxWindowOldSize+maxStepMemSize+kPatchCacheSize_min;
+        *out_betterCacheSize=betterOldSize+maxStepMemSize+(isLoadOldAll?kPatchCacheSize_bestmin:patchCacheSize);
+    }
+
 typedef struct _WinPatchListener_t {
     hpatch_TDecompress*   decompressPlugin;
+    hpatch_BOOL           isLoadOldAll;
     hpatch_StreamPos_t    patchCacheSize;
     const TPatchChecksumSet* checksumSet;
     size_t                threadNum;
@@ -1000,23 +1023,11 @@ static hpatch_BOOL _win_onDiffInfo(struct winpatch_listener_t* listener,const hp
         }
     }
     {//memory
-        const hpatch_StreamPos_t minBufSize=info->maxWindowOldSize+info->maxStepMemSize+(hpatch_kFileIOBufBetterSize*3);
-        hpatch_StreamPos_t betterBufSize=(ctx->threadNum>1)?minBufSize*2-info->maxStepMemSize:minBufSize;
-        const hpatch_StreamPos_t idealBufSize=info->maxWindowOldSize+info->maxStepMemSize+ctx->patchCacheSize;
-        size_t allocSize;
-        *out_temp_cache=0;
-        if (((*out_temp_cache)==0)&&(betterBufSize<idealBufSize)){
-            allocSize=(size_t)idealBufSize;
-            *out_temp_cache=(unsigned char*)malloc(allocSize);
-        }
-        if (((*out_temp_cache)==0)&&(minBufSize<betterBufSize)){
-            allocSize=(size_t)betterBufSize;
-            *out_temp_cache=(unsigned char*)malloc(allocSize);
-        }
-        if ((*out_temp_cache)==0){
-            allocSize=(size_t)minBufSize;
-            *out_temp_cache=(unsigned char*)malloc(allocSize);
-        }
+        hpatch_size_t allocSize;
+        hpatch_StreamPos_t minCacheSize,betterCacheSize;
+        getWinPatchMemSize(&minCacheSize,&betterCacheSize,ctx->isLoadOldAll,info->oldDataSize,
+                           ctx->patchCacheSize,info->maxWindowOldSize,info->maxStepMemSize,ctx->threadNum);
+        *out_temp_cache=allocPatchMemCache(minCacheSize,betterCacheSize,&allocSize);
         if ((*out_temp_cache)==0){
             LOG_ERR("malloc window diff temp cache memory ERROR!\n");
             return hpatch_FALSE;
@@ -1136,7 +1147,9 @@ static void _printHDiffInfos(const _THDiffInfos* diffInfos,hpatch_BOOL isInDirDi
 #endif
 #if (_IS_NEED_VCDIFF)
         if (diffInfos->isVcDiff){
-            if (diffInfos->vcdiffInfo.isHDiffzAppHead_a)
+            if (diffInfos->vcdiffInfo.isHDiffzAppHead_window)
+                typeTag="VCDiff (with hdiffz & window tag)";
+            else if (diffInfos->vcdiffInfo.isHDiffzAppHead_a)
                 typeTag="VCDiff (with hdiffz tag)";
             else if (diffInfos->vcdiffInfo.isGoogleVersion)
                 typeTag="VCDiff (with google tag)";
@@ -1269,29 +1282,22 @@ int hpatch_printFilesInfos(int fileCount,const char* fileNames[]){
 
 #define _free_mem(p) { if (p) { free(p); p=0; } }
 
-static TByte* getPatchMemCache(hpatch_BOOL isLoadOldAll,size_t patchCacheSize,size_t mustAppendMemSize,
-                               hpatch_StreamPos_t oldDataSize,size_t* out_memCacheSize){
+static TByte* allocPatchMemCache(hpatch_StreamPos_t kMinCacheSize,hpatch_StreamPos_t betterCacheSize,size_t* out_memCacheSize){
     TByte* temp_cache=0;
     size_t temp_cache_size;
     {
-        hpatch_StreamPos_t limitCacheSize;
-        const hpatch_StreamPos_t bestMaxCacheSize=oldDataSize+kPatchCacheSize_bestmin;
-        if (isLoadOldAll){
-            limitCacheSize=bestMaxCacheSize;
-        }else{
-            limitCacheSize=(patchCacheSize<kPatchCacheSize_min)?kPatchCacheSize_min:patchCacheSize;
-            limitCacheSize=(limitCacheSize<bestMaxCacheSize)?limitCacheSize:bestMaxCacheSize;
-        }
-        if (limitCacheSize>(size_t)(_kNULL_SIZE-mustAppendMemSize))//too large
-            limitCacheSize=(size_t)(_kNULL_SIZE-mustAppendMemSize);
-        temp_cache_size=(size_t)limitCacheSize;
+        betterCacheSize=_hpatch_pos_max(kMinCacheSize,betterCacheSize);
+        if ((sizeof(hpatch_StreamPos_t)>sizeof(size_t))&&(betterCacheSize>=(size_t)(_kNULL_SIZE)))//too large
+            betterCacheSize=(size_t)(_kNULL_SIZE/2);
+        temp_cache_size=(size_t)betterCacheSize;
     }
-    while (temp_cache_size>=kPatchCacheSize_min){
-        temp_cache=(TByte*)malloc(mustAppendMemSize+temp_cache_size);
-        if (temp_cache) break;
+    while (temp_cache_size>=kMinCacheSize){
+        temp_cache=(TByte*)malloc(temp_cache_size);
+        if ((temp_cache!=0)||(temp_cache_size==kMinCacheSize)) break;
         temp_cache_size>>=1;
+        temp_cache_size=_hpatch_pos_max(temp_cache_size,kMinCacheSize);
     }
-    *out_memCacheSize=(temp_cache)?(mustAppendMemSize+temp_cache_size):0;
+    *out_memCacheSize=(temp_cache)?temp_cache_size:0;
     return temp_cache;
 }
 
@@ -1349,7 +1355,7 @@ static TByte* getPatchMemCache(hpatch_BOOL isLoadOldAll,size_t patchCacheSize,si
 #endif //_IS_NEED_PRINT_PROGRESS
 
 int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFileName,
-           hpatch_BOOL isLoadOldAll,size_t patchCacheSize,hpatch_StreamPos_t diffDataOffert,
+           hpatch_BOOL isLoadOldAll,size_t patchCacheSize,hpatch_StreamPos_t diffDataOffset,
            hpatch_StreamPos_t diffDataSize,TPatchChecksumSet* checksumSet,size_t threadNum){
     int     result=HPATCH_SUCCESS;
     int     _isInClear=hpatch_FALSE;
@@ -1362,7 +1368,7 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
     const hpatch_TStreamInput* poldData=&oldData.base;
     const hpatch_TStreamOutput* pnewData=&newData.base;
     TByte*               temp_cache=0;
-    size_t               temp_cache_size;
+    size_t               temp_cache_size=0;
     int                  patch_result=HPATCH_SUCCESS;
 #if (_IS_NEED_PRINT_PROGRESS)
     hpatch_TProgressStreamOutput _progressStreamOutput;
@@ -1384,8 +1390,8 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
         check(hpatch_TFileStreamInput_open(&diffData,diffFileName),
               HPATCH_OPENREAD_ERROR,"open diffFile for read");
 #if (_IS_NEED_SFX)
-        if (diffDataOffert>0){ //run sfx
-            check(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffert),
+        if (diffDataOffset>0){ //run sfx
+            check(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffset),
                   HPATCH_RUN_SFX_DIFFOFFSERT_ERROR,"readed sfx diffFile offset");
             check(diffData.base.streamSize>=diffDataSize,
                   HPATCH_RUN_SFX_DIFFOFFSERT_ERROR,"readed sfx diffFile size");
@@ -1420,36 +1426,35 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
     if (diffInfos.isVcDiff) hpatch_TFileStreamOutput_setRandomOut(&newData,hpatch_TRUE);
 #endif
     {
-        hpatch_StreamPos_t maxWindowSize=poldData->streamSize;
-        hpatch_size_t      mustAppendMemSize=0;
 #if (_IS_NEED_WINDOW_DIFF)
-        if (diffInfos.isWindowDiff){
-            temp_cache=0; temp_cache_size=0;
+        if (diffInfos.isWindowDiff){ //alloc mem in _win_onDiffInfo
         }else
 #endif
-        {
+        { //alloc mem
+            hpatch_StreamPos_t minCacheSize,betterCacheSize;
+            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,poldData->streamSize,patchCacheSize,0);
 #if (_IS_NEED_VCDIFF)
-            if (diffInfos.isVcDiff){
-                hpatch_StreamPos_t maxSrcTargetSize=diffInfos.vcdiffInfo.maxSrcWindowsSize+diffInfos.vcdiffInfo.maxTargetWindowsSize;
-                maxWindowSize=((!diffInfos.vcdiffInfo.isHDiffzAppHead_a)&&(maxSrcTargetSize<=maxWindowSize+64*(1<<20)))?
-                        maxSrcTargetSize:diffInfos.vcdiffInfo.maxSrcWindowsSize;
-                if (!diffInfos.vcdiffInfo.isHDiffzAppHead_a)
-                    isLoadOldAll=hpatch_TRUE;
+            if (diffInfos.isVcDiff){//get vcd patch mem size
+                hpatch_StreamPos_t stWindowsSize=diffInfos.vcdiffInfo.maxSrcWindowsSize+diffInfos.vcdiffInfo.maxTargetWindowsSize;
+                if (isLoadOldAll)
+                    betterCacheSize=stWindowsSize+kPatchCacheSize_bestmin;
+                else if ((!diffInfos.vcdiffInfo.isHDiffzAppHead_a)||(diffInfos.vcdiffInfo.isHDiffzAppHead_window))// vcd default
+                    betterCacheSize=stWindowsSize+patchCacheSize;
             }
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
             if (diffInfos.isSingleCompressedDiff){
-                check(diffInfos.sdiffInfo.stepMemSize==(size_t)diffInfos.sdiffInfo.stepMemSize,HPATCH_MEM_ERROR,"stepMemSize too large");
-                mustAppendMemSize=(size_t)diffInfos.sdiffInfo.stepMemSize;
+                getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,poldData->streamSize,
+                                patchCacheSize,diffInfos.sdiffInfo.stepMemSize);
             }
 #endif
-            temp_cache=getPatchMemCache(isLoadOldAll,patchCacheSize,mustAppendMemSize,maxWindowSize, &temp_cache_size);
+            {
+                temp_cache=allocPatchMemCache(minCacheSize,betterCacheSize,&temp_cache_size);
+                check(temp_cache,HPATCH_MEM_ERROR,"alloc cache memory");
+            }
         }
     }
-#if (_IS_NEED_WINDOW_DIFF)
-    if (!diffInfos.isWindowDiff)
-#endif
-        check(temp_cache,HPATCH_MEM_ERROR,"alloc cache memory");
+
 #if (_IS_NEED_PRINT_PROGRESS)
     pnewData=_progressStreamInput_wrapper(&_progressStreamOutput,pnewData);
 #endif
@@ -1459,6 +1464,7 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
         struct winpatch_listener_t  winListener;
         TWindowPatchResult          wResult;
         winCtx.decompressPlugin=decompressPlugin;
+        winCtx.isLoadOldAll=isLoadOldAll;
         winCtx.patchCacheSize=patchCacheSize;
         winCtx.checksumSet=checksumSet;
         winCtx.threadNum=threadNum;
@@ -1480,7 +1486,6 @@ int hpatch(const char* oldFileName,const char* diffFileName,const char* outNewFi
 #endif
 #if (_IS_NEED_SINGLE_STREAM_DIFF)
     if (diffInfos.isSingleCompressedDiff){
-        check(temp_cache_size>=diffInfos.sdiffInfo.stepMemSize+hpatch_kStreamCacheSize*3,HPATCH_MEM_ERROR,"alloc cache memory");
         if (!patch_single_compressed_diff(pnewData,poldData,&diffData.base,diffInfos.sdiffInfo.diffDataPos,
                                           diffInfos.sdiffInfo.uncompressedSize,diffInfos.sdiffInfo.compressedSize,decompressPlugin,
                                           diffInfos.sdiffInfo.coverCount,(size_t)diffInfos.sdiffInfo.stepMemSize,
@@ -1535,7 +1540,7 @@ clear:
 int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPath,
                hpatch_BOOL isLoadOldAll,size_t patchCacheSize,size_t kMaxOpenFileNumber,
                TPatchChecksumSet* checksumSet,IHPatchDirListener* hlistener,
-               hpatch_StreamPos_t diffDataOffert,hpatch_StreamPos_t diffDataSize,size_t threadNum){
+               hpatch_StreamPos_t diffDataOffset,hpatch_StreamPos_t diffDataSize,size_t threadNum){
     int     result=HPATCH_SUCCESS;
     int     _isInClear=hpatch_FALSE;
     double  time0=clock_s();
@@ -1545,7 +1550,6 @@ int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPa
     TByte*               p_temp_mem=0;
     TByte*               temp_cache=0;
     size_t               temp_cache_size;
-    size_t               min_temp_cache_size=kPatchCacheSize_min;
     hpatch_TDecompress   _decompressPlugin={0};
     const hpatch_TStreamInput*  oldStream=0;
     const hpatch_TStreamOutput* newStream=0;
@@ -1566,8 +1570,8 @@ int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPa
         }
         check(hpatch_TFileStreamInput_open(&diffData,diffFileName),HPATCH_OPENREAD_ERROR,"open diffFile for read");
 #if (_IS_NEED_SFX)
-        if (diffDataOffert>0){ //run sfx
-            check(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffert),
+        if (diffDataOffset>0){ //run sfx
+            check(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffset),
                   HPATCH_RUN_SFX_DIFFOFFSERT_ERROR,"readed sfx diffFile offset");
             check(diffData.base.streamSize>=diffDataSize,
                   HPATCH_RUN_SFX_DIFFOFFSERT_ERROR,"readed sfx diffFile size");
@@ -1616,24 +1620,27 @@ int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPa
     }
     check(hlistener->patchBegin(hlistener,&dirPatcher),
           DIRPATCH_PATCHBEGIN_ERROR,"dir patch begin");
-    {//mem cache
-        size_t mustAppendMemSize=0;
-#if (_IS_NEED_SINGLE_STREAM_DIFF)
-        if (dirDiffInfo->isSingleCompressedDiff){
-            mustAppendMemSize+=(size_t)dirDiffInfo->sdiffInfo.stepMemSize;
-            min_temp_cache_size+=(size_t)dirDiffInfo->sdiffInfo.stepMemSize;
-        }
-#endif
+    { //alloc mem
+        hpatch_StreamPos_t minCacheSize,betterCacheSize;
+        getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,dirDiffInfo->hdiffInfo.oldDataSize,patchCacheSize,0);
 #if (_IS_NEED_WINDOW_DIFF)
         if (dirDiffInfo->isWindowDiff){
-            mustAppendMemSize+=(size_t)(dirDiffInfo->winDiffInfo.maxWindowOldSize+dirDiffInfo->winDiffInfo.maxStepMemSize);
-            min_temp_cache_size+=(size_t)(dirDiffInfo->winDiffInfo.maxWindowOldSize+dirDiffInfo->winDiffInfo.maxStepMemSize);
+            getWinPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,dirDiffInfo->winDiffInfo.oldDataSize,
+                               patchCacheSize,dirDiffInfo->winDiffInfo.maxWindowOldSize,
+                               dirDiffInfo->winDiffInfo.maxStepMemSize,threadNum);
         }
 #endif
-        p_temp_mem=getPatchMemCache(isLoadOldAll,patchCacheSize,mustAppendMemSize,
-                                    dirDiffInfo->hdiffInfo.oldDataSize, &temp_cache_size);
-        check(p_temp_mem,HPATCH_MEM_ERROR,"alloc cache memory");
-        temp_cache=p_temp_mem;
+#if (_IS_NEED_SINGLE_STREAM_DIFF)
+        if (dirDiffInfo->isSingleCompressedDiff){
+            getPatchMemSize(&minCacheSize,&betterCacheSize,isLoadOldAll,dirDiffInfo->sdiffInfo.oldDataSize,
+                            patchCacheSize,dirDiffInfo->sdiffInfo.stepMemSize);
+        }
+#endif
+        {
+            temp_cache=allocPatchMemCache(minCacheSize,betterCacheSize,&temp_cache_size);
+            check(temp_cache,HPATCH_MEM_ERROR,"alloc cache memory");
+        }
+        p_temp_mem=temp_cache;
     }
     {// checksumPlugin
         int wantChecksumCount = checksumSet->isCheck_diffData+checksumSet->isCheck_oldRefData+
@@ -1661,10 +1668,6 @@ int hpatch_dir(const char* oldPath,const char* diffFileName,const char* outNewPa
     }
 
     {//old data
-        if (temp_cache_size>=dirDiffInfo->hdiffInfo.oldDataSize+min_temp_cache_size){
-            // all old while auto cache by patch; not need open old files at same time
-            kMaxOpenFileNumber=kMaxOpenFileNumber_limit_min;
-        }
         check(TDirPatcher_openOldRefAsStream(&dirPatcher,kMaxOpenFileNumber,&oldStream),
               DIRPATCH_OPEN_OLDPATH_ERROR,"open oldFile");
     }
@@ -1712,7 +1715,7 @@ TByte _sfx_guid_node[_sfx_guid_node_size]={
     0x4a,0x5d,
     0xa9,0xd5,
     0x73,0x03,0xa8,0x2f,0xd0,0x8e,
-    0xff,0xff,0xff,0xff,  // saved diffDataOffert , selfExecute fileSize < 4GB
+    0xff,0xff,0xff,0xff,  // saved diffDataOffset , selfExecute fileSize < 4GB
     0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff}; // diffDataSize
 
 static TByte* _search(TByte* src,TByte* src_end,const TByte* sub,const TByte* sub_end){
@@ -1752,7 +1755,7 @@ static int createSfx_notCheckDiffFile_byStream(const hpatch_TStreamInput*  selfE
     TByte*  pmem=0;
     hpatch_StreamPos_t  writePos=0;
     hpatch_BOOL         isFoundGuid=hpatch_FALSE;
-    const hpatch_StreamPos_t  diffDataOffert=selfExecute->streamSize;
+    const hpatch_StreamPos_t  diffDataOffset=selfExecute->streamSize;
     const hpatch_StreamPos_t  diffDataSize=diffData->streamSize;
     {//mem
         pmem=(TByte*)malloc(_sfx_guid_node_size+hpatch_kFileIOBufBetterSize);
@@ -1784,7 +1787,7 @@ static int createSfx_notCheckDiffFile_byStream(const hpatch_TStreamInput*  selfE
                     for (i=0; i<sizeof(hpatch_uint32_t); ++i){
                         size_t di=_sfx_guid_size+i;
                         assert(pos[di]==0xff);
-                        pos[di]=(TByte)(diffDataOffert>>(8*i));
+                        pos[di]=(TByte)(diffDataOffset>>(8*i));
                     }
                     for (i=0; i<sizeof(hpatch_uint64_t); ++i){
                         size_t di=_sfx_guid_size+sizeof(hpatch_uint32_t)+i;
@@ -1801,7 +1804,7 @@ static int createSfx_notCheckDiffFile_byStream(const hpatch_TStreamInput*  selfE
             writePos+=(size_t)(wbuf_end-wbuf);
         }
     }
-    assert(writePos==diffDataOffert);
+    assert(writePos==diffDataOffset);
     check(isFoundGuid,HPATCH_CREATE_SFX_SFXTYPE_ERROR,"createSfx() selfExecute type");
     {//copy diffData
         const hpatch_StreamPos_t dataSize=diffData->streamSize;
@@ -1898,7 +1901,7 @@ clear:
     return result;
 }
 
-hpatch_BOOL getDiffDataOffertInSfx(hpatch_StreamPos_t* out_diffDataOffert,hpatch_StreamPos_t* out_diffDataSize){
+hpatch_BOOL getDiffDataOffertInSfx(hpatch_StreamPos_t* out_diffDataOffset,hpatch_StreamPos_t* out_diffDataSize){
     hpatch_uint32_t diffOff=0;
     hpatch_uint64_t diffSize=0;
     size_t i;
@@ -1915,7 +1918,7 @@ hpatch_BOOL getDiffDataOffertInSfx(hpatch_StreamPos_t* out_diffDataOffert,hpatch
     }
     if (diffSize==(~(hpatch_uint64_t)0)) return hpatch_FALSE;
     
-    if (out_diffDataOffert) *out_diffDataOffert=diffOff;
+    if (out_diffDataOffset) *out_diffDataOffset=diffOff;
     if (out_diffDataSize) *out_diffDataSize=diffSize;
     return hpatch_TRUE;
 }

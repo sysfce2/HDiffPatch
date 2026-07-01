@@ -72,7 +72,7 @@ typedef struct TDirDiffInfo{
 
 hpatch_BOOL getDirDiffInfo(TDirDiffInfo* out_info,const hpatch_TStreamInput* diffFile);
 hpatch_BOOL getDirDiffInfoByFile(TDirDiffInfo* out_info,const char* diffFileName,
-                                 hpatch_StreamPos_t diffDataOffert,hpatch_StreamPos_t diffDataSize);
+                                 hpatch_StreamPos_t diffDataOffset,hpatch_StreamPos_t diffDataSize);
 static hpatch_inline
 hpatch_BOOL getIsDirDiffFile(const char* diffFileName){
      TDirDiffInfo dirDiffInfo;

@@ -38,7 +38,7 @@ extern "C" {
 
 #define HDIFFPATCH_VERSION_MAJOR    5
 #define HDIFFPATCH_VERSION_MINOR    0
-#define HDIFFPATCH_VERSION_RELEASE  0
+#define HDIFFPATCH_VERSION_RELEASE  1
 
 #define _HDIFFPATCH_VERSION          HDIFFPATCH_VERSION_MAJOR.HDIFFPATCH_VERSION_MINOR.HDIFFPATCH_VERSION_RELEASE
 #define _HDIFFPATCH_QUOTE(str) #str
@@ -157,6 +157,10 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
 #define _hpatch_align_lower(p,align2pow) _hpatch_align_type_lower(hpatch_size_t,p,align2pow)
 #define _hpatch_align_upper(p,align2pow) _hpatch_align_lower(((hpatch_size_t)(p))+((align2pow)-1),align2pow)
     
+static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_min(hpatch_StreamPos_t a,hpatch_StreamPos_t b){ return (a<b)?a:b; }
+static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t a,hpatch_StreamPos_t b){ return (a>b)?a:b; }
+
+
     typedef void* hpatch_TStreamInputHandle;
     typedef void* hpatch_TStreamOutputHandle;
     
@@ -182,7 +186,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
     
     //default once I/O (read/write) byte size
     #ifndef hpatch_kStreamCacheSize
-    #   define hpatch_kStreamCacheSize      (1024*4)
+    #   define hpatch_kStreamCacheSize      4096
     #endif
     #ifndef hpatch_kFileIOBufBetterSize
     #   define hpatch_kFileIOBufBetterSize  (1024*64)
@@ -203,7 +207,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
     typedef struct hpatch_compressedDiffInfo{
         hpatch_StreamPos_t  newDataSize;
         hpatch_StreamPos_t  oldDataSize;
-        hpatch_uint         compressedCount;//need open hpatch_decompressHandle number
+        hpatch_uint         compressedCount;//number of decompress handles that must be opened simultaneously
         char                compressType[hpatch_kMaxPluginTypeLength+1]; //ascii cstring 
     } hpatch_compressedDiffInfo;
     
@@ -216,7 +220,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_dec_close_error,
     } hpatch_dec_error_t;
     typedef struct hpatch_TDecompress{
-        hpatch_BOOL        (*is_can_open)(const char* compresseType);
+        hpatch_BOOL        (*is_can_open)(const char* compressType);
         //error return 0.
         hpatch_decompressHandle   (*open)(struct hpatch_TDecompress* decompressPlugin,
                                           hpatch_StreamPos_t dataSize,
@@ -234,7 +238,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
                                           const struct hpatch_TStreamInput* codeStream,
                                           hpatch_StreamPos_t code_begin,
                                           hpatch_StreamPos_t code_end);
-        volatile hpatch_dec_error_t decError; //if you used decError value, once patch must used it's own hpatch_TDecompress
+        volatile hpatch_dec_error_t decError; //if decError is read, each patch session must use its own hpatch_TDecompress instance
     } hpatch_TDecompress;
     #define _hpatch_update_decError(decompressPlugin,errorCode) \
         do { if ((decompressPlugin)->decError==hpatch_dec_ok)   \
@@ -334,7 +338,7 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
 
     typedef struct sspatch_coversListener_t{
         void*         import;
-        void        (*onStepCoversReset)(struct sspatch_coversListener_t* listener,hpatch_StreamPos_t leaveCoverCount);//can NULL, data(in covers_cache) will invalid; if leaveCoverCount==0, step finish 
+        void        (*onStepCoversReset)(struct sspatch_coversListener_t* listener,hpatch_StreamPos_t leaveCoverCount);//can be NULL; data in covers_cache will become invalid; if leaveCoverCount==0, the step is finished
         void        (*onStepCovers)(struct sspatch_coversListener_t* listener,
                                     const unsigned char* covers_cache,const unsigned char* covers_cacheEnd);//if covers_cache==covers_cacheEnd==0, step finish
     } sspatch_coversListener_t;
@@ -372,18 +376,35 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
         hpatch_StreamPos_t  maxStepMemSize;
         hpatch_StreamPos_t  maxSubCoverCount;
         hpatch_StreamPos_t  maxWindowOldSize;
-        hpatch_StreamPos_t  checksumByteSize;      //0=no checksum
+        hpatch_StreamPos_t  checksumByteSize;      //0 no checksum
         hpatch_StreamPos_t  extraDataSize;
         hpatch_StreamPos_t  uncompressedSize;      //windowDiffStreamSize
-        hpatch_StreamPos_t  compressedSize;        //0=uncompressed, >0=compressed
+        hpatch_StreamPos_t  compressedSize;        //0 uncompressed, >0 compressed
         hpatch_StreamPos_t  otherInfoPos;
         hpatch_StreamPos_t  otherInfoEndPos;
-        hpatch_StreamPos_t  windowDataPos;         //window data begin pos; old,new,diff's checksum begin pos=windowDataPos-3*checksumByteSize
+        hpatch_StreamPos_t  windowDataPos; //window data begin pos(compressed data begin pos);
+                                           //the checksum section for old/new/diff data begin pos = windowDataPos-3*checksumByteSize;
         hpatch_StreamPos_t  _headFixedInfoPos;
         char                compressType[hpatch_kMaxPluginTypeLength+1];
         char                checksumType[hpatch_kMaxPluginTypeLength+1];
     } hpatch_windowDiffInfo;
     
+    typedef enum TWindowPatchResult{
+        kWindowPatch_ok=0,
+        kWindowPatch_load_head_error,
+        kWindowPatch_new_size_error,
+        kWindowPatch_old_size_error,
+        kWindowPatch_onDiffInfo_error,
+        kWindowPatch_temp_mem_error,
+        kWindowPatch_decompress_open_error,
+        kWindowPatch_patch_error,
+        kWindowPatch_checksum_plugin_error,
+        kWindowPatch_checksum_open_error,
+        kWindowPatch_checksum_old_error,
+        kWindowPatch_checksum_new_error,
+        kWindowPatch_checksum_diff_error,
+    } TWindowPatchResult;
+
     hpatch_inline static void _winDiffInfoToHDiffInfo(hpatch_compressedDiffInfo* out_diffInfo,const hpatch_windowDiffInfo* winDiffInfo){
         out_diffInfo->newDataSize=winDiffInfo->newDataSize;
         out_diffInfo->oldDataSize=winDiffInfo->oldDataSize;
@@ -398,10 +419,10 @@ typedef    hpatch_BOOL  hpatch_FileError_t;// 0: no error; other: error;
                                   const hpatch_windowDiffInfo* info,
                                   hpatch_TDecompress** out_decompressPlugin,//find decompressPlugin by info->compressType
                                   struct hpatch_TChecksum** out_checksumPlugin, //find checksumPlugin by info->checksumType
-                                  hpatch_BOOL* isChecksumNew,   // *isChecksumNew default true when have info->checksumType
-                                  hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff, 
+                                  hpatch_BOOL* isChecksumNew,   // *isChecksumNew default true when info->checksumByteSize>0
+                                  hpatch_BOOL* isChecksumOld,hpatch_BOOL* isChecksumDiff,//*isChecksumOld & *isChecksumDiff default false
                                   unsigned char** out_temp_cache,    //*out_temp_cacheEnd-*out_temp_cache == info->maxWindowOldSize + info->stepMemSize + (I/O cache memory)
-                                  unsigned char** out_temp_cacheEnd);//  note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
+                                  unsigned char** out_temp_cacheEnd);//    note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
         void        (*onPatchFinish)(struct winpatch_listener_t* listener, //onPatchFinish can null
                                      unsigned char* temp_cache, unsigned char* temp_cacheEnd);
     } winpatch_listener_t;

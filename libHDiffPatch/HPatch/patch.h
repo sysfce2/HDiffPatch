@@ -98,8 +98,8 @@ hpatch_inline static hpatch_BOOL
 //patch with decompress plugin
 //  used (hpatch_kStreamCacheSize*6 stack memory) + (decompress buffer*4)
 //  compressedDiff create by create_compressed_diff() or create_compressed_diff_stream()
-//  decompressPlugin can null when no compressed data in compressedDiff
-//  if use patch_decompress_with_cache(), can passing larger memory cache to optimize speed
+//  decompressPlugin can be null when there is no compressed data in compressedDiff
+//  if using patch_decompress_with_cache(), a larger memory cache can be passed to optimize speed
 hpatch_BOOL patch_decompress(const hpatch_TStreamOutput* out_newData,       //sequential write
                              const hpatch_TStreamInput*  oldData,           //random read
                              const hpatch_TStreamInput*  compressedDiff,    //random read
@@ -162,7 +162,7 @@ hpatch_BOOL hpatch_coverList_close(hpatch_TCoverList* coverList) {
 //  every byte in singleCompressedDiff will only be read once in order
 //  singleCompressedDiff create by create_single_compressed_diff() or create_single_compressed_diff_stream() or create_hdiff_by_sign()
 //  you can download&patch diffData at the same time, without saving it to disk
-//  same as call getSingleCompressedDiffInfo() + listener->onDiffInfo() + patch_single_compressed_diff()
+//  same as calling getSingleCompressedDiffInfo() + listener->onDiffInfo() + patch_single_compressed_diff()
 static hpatch_force_inline
 hpatch_BOOL patch_single_stream(sspatch_listener_t* listener, //call back when got diffInfo
                                 const hpatch_TStreamOutput* out_newData,          //sequential write
@@ -212,8 +212,8 @@ hpatch_BOOL getSingleCompressedDiffInfo_mem(hpatch_singleCompressedDiffInfo* out
 //	note: (I/O cache memory) >= hpatch_kStreamCacheSize*3
 //  temp_cache_end-temp_cache == stepMemSize + (I/O cache memory)
 //  singleCompressedDiff create by create_single_compressed_diff() or create_single_compressed_diff_stream() or create_hdiff_by_sign()
-//  decompressPlugin can null when no compressed data in singleCompressedDiff
-//  same as call compressed_stream_as_uncompressed() + patch_single_stream_diff()
+//  decompressPlugin can be null when there is no compressed data in singleCompressedDiff
+//  same as calling compressed_stream_as_uncompressed() + patch_single_stream_diff()
 static hpatch_force_inline
 hpatch_BOOL patch_single_compressed_diff(const hpatch_TStreamOutput* out_newData,          //sequential write
                                          const hpatch_TStreamInput*  oldData,              //random read
@@ -252,22 +252,6 @@ hpatch_BOOL getWindowDiffInfo(hpatch_windowDiffInfo*      out_diffInfo,
                               const hpatch_TStreamInput*  windowDiff,   //sequential read
                               hpatch_StreamPos_t diffInfo_pos//default 0, begin pos in windowDiff
                               );
-
-typedef enum TWindowPatchResult{
-    kWindowPatch_ok=0,
-    kWindowPatch_load_head_error,
-    kWindowPatch_new_size_error,
-    kWindowPatch_old_size_error,
-    kWindowPatch_onDiffInfo_error,
-    kWindowPatch_temp_mem_error,
-    kWindowPatch_decompress_open_error,
-    kWindowPatch_patch_error,
-    kWindowPatch_checksum_plugin_error,
-    kWindowPatch_checksum_open_error,
-    kWindowPatch_checksum_old_error,
-    kWindowPatch_checksum_new_error,
-    kWindowPatch_checksum_diff_error,
-} TWindowPatchResult;
 
 TWindowPatchResult patch_window_diff(struct winpatch_listener_t*  listener,
                                      const hpatch_TStreamOutput*  out_newData,         //sequential write

@@ -44,7 +44,8 @@ typedef struct hpatch_VcDiffInfo{
     hpatch_StreamPos_t  appHeadDataLen;
     hpatch_StreamPos_t  windowOffset;
     hpatch_BOOL         isGoogleVersion;
-    hpatch_BOOL         isHDiffzAppHead_a;
+    hpatch_BOOL         isHDiffzAppHead_a; //version
+    hpatch_BOOL         isHDiffzAppHead_window;
     vcdiff_compressType compressorID;
     //WindowInfo
     hpatch_StreamPos_t  maxSrcWindowsSize;

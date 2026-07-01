@@ -290,6 +290,19 @@ else
   CXXFLAGS += -fvisibility-inlines-hidden
 endif
 
+ifeq ($(BSD),0)
+	DEF_FLAGS += -D_IS_NEED_BSDIFF=0
+else
+	DEF_FLAGS += -D_IS_NEED_BSDIFF=1
+endif
+ifeq ($(VCD),0)
+	DEF_FLAGS += -D_IS_NEED_VCDIFF=0
+else
+	DEF_FLAGS += -D_IS_NEED_VCDIFF=1
+endif
+
+UTEST_FLAGS := $(DEF_FLAGS)
+
 ifeq ($(BZIP2),0)
 else
     DEF_FLAGS += -D_CompressPlugin_bz2
@@ -334,16 +347,6 @@ else
   else
     DEF_FLAGS += -D_ChecksumPlugin_xxh3 -D_ChecksumPlugin_xxh128 -I$(XXH_PATH)
   endif
-endif
-ifeq ($(BSD),0)
-	DEF_FLAGS += -D_IS_NEED_BSDIFF=0
-else
-	DEF_FLAGS += -D_IS_NEED_BSDIFF=1
-endif
-ifeq ($(VCD),0)
-	DEF_FLAGS += -D_IS_NEED_VCDIFF=0
-else
-	DEF_FLAGS += -D_IS_NEED_VCDIFF=1
 endif
 ifeq ($(LZMA),0)
 else
@@ -446,7 +449,7 @@ hpatchz: $(HPATCH_OBJ)
 hdiffz: libhdiffpatch.a
 	$(CXX) hdiffz.cpp libhdiffpatch.a $(CXXFLAGS) $(DIFF_LINK) -o hdiffz
 unit_test: libhdiffpatch.a 
-	$(CXX) ./test/unit_test.cpp libhdiffpatch.a $(DIFF_LINK) -o unit_test
+	$(CXX) ./test/unit_test.cpp libhdiffpatch.a $(UTEST_FLAGS) $(DIFF_LINK) -o unit_test
 
 ifeq ($(OS),Windows_NT) # mingw?
   RM := del /Q /F

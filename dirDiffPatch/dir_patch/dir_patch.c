@@ -52,14 +52,14 @@ static const char* kVersionType="HDIFF19";
 
 
 hpatch_BOOL getDirDiffInfoByFile(TDirDiffInfo* out_info,const char* diffFileName,
-                                 hpatch_StreamPos_t diffDataOffert,hpatch_StreamPos_t diffDataSize){
+                                 hpatch_StreamPos_t diffDataOffset,hpatch_StreamPos_t diffDataSize){
     hpatch_BOOL          result=hpatch_TRUE;
     hpatch_TFileStreamInput     diffData;
     hpatch_TFileStreamInput_init(&diffData);
     
     checki(hpatch_TFileStreamInput_open(&diffData,diffFileName),"getDirDiffInfoByFile() file open");
-    if (diffDataOffert>0){
-        checki(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffert),
+    if (diffDataOffset>0){
+        checki(hpatch_TFileStreamInput_setOffset(&diffData,diffDataOffset),
             "getDirDiffInfoByFile() file setOffset");
         check(diffData.base.streamSize>=diffDataSize);
         diffData.base.streamSize=diffDataSize;

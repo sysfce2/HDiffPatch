@@ -22,6 +22,7 @@ extern "C" {
     //  cacheMemory:
     //    cacheMemory is used for file IO, different cacheMemory only affects patch speed;
     //    recommended 1M,8M,... if cacheMemory<0 then default 1024*1024*4;
+    //  isChecksumNewData: 0 or 1, recommended 1; auto checksum newData when patching VCDIFF and window diffData;
     int hpatchz(const char *oldFileName,const char *diffFileName,const char *outNewFileName,
                 int64_t cacheMemory,size_t threadNum,unsigned int isChecksumNewData) H_PATCH_EXPORT;
 
