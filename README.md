@@ -12,9 +12,9 @@
 
 [HDiffPatch] defines its own patch file format, this lib is also compatible with the [bsdiff4] & [endsley/bsdiff] patch file format and [compatible](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843) with the [open-vcdiff] & [xdelta3] patch file format [VCDIFF(RFC 3284)].   
 
-if need patch (OTA) on embedded systems,MCU,NB-IoT..., see demo [HPatchLite], +[tinyuz] decompressor can run on 1KB RAM devices! HPatchLite also supports a simple inplace-patch implementation to support storage-constrained devices.   
+if need patch (OTA) on embedded systems,MCU,NB-IoT..., see demo [HPatchLite], with [tinyuz] decompressor can run on 1KB RAM devices! HPatchLite also supports a simple inplace-patch implementation to support storage-constrained devices.   
 
-update your own Android Apk? Jar or Zip file diff & patch? try [ApkDiffPatch], to create smaller delta/differential! NOTE: *ApkDiffPath can't be used by Android app store, because it requires re-signing apks before diff.*   
+update your own Android Apk? Jar or Zip file diff & patch? try [ApkDiffPatch], to create smaller delta/differential! NOTE: *ApkDiffPatch can't be used by Android app store, because it requires re-signing apks before diff.*   
 
 [sfpatcher] not require re-signing apks (like [archive-patcher]), is designed for Android app store, create smaller patch file for apk, patch speed up by a factor of xx than archive-patcher & run with O(1) memory.   
 
@@ -92,11 +92,11 @@ build `HDiffPatch/builds/vc/HDiffPatch.sln` by [`Visual Studio`](https://visuals
 ## **diff** command line usage:   
 diff     usage: **hdiffz** [options] **oldPath newPath outDiffFile**   
 compress usage: **hdiffz** [-c-...]  **"" newPath outDiffFile**   
-test    usage: **hdiffz**    -t     **oldPath newPath testDiffFile**   
-resave  usage: **hdiffz** [-c-...]  **diffFile outDiffFile**   
-print    info: **hdiffz** -info **diffFile**   
-get  manifest: **hdiffz** [-g#...] [-C-checksumType] **inputPath -M#outManifestTxtFile**   
-manifest diff: **hdiffz** [options] **-M-old#oldManifestFile -M-new#newManifestFile oldPath newPath outDiffFile**   
+test     usage: **hdiffz**    -t     **oldPath newPath testDiffFile**   
+resave   usage: **hdiffz** [-c-...]  **diffFile outDiffFile**   
+print     info: **hdiffz** -info **diffFile**   
+get   manifest: **hdiffz** [-g#...] [-C-checksumType] **inputPath -M#outManifestTxtFile**   
+manifest  diff: **hdiffz** [options] **-M-old#oldManifestFile -M-new#newManifestFile oldPath newPath outDiffFile**   
 ```
   oldPath newPath inputPath can be file or directory(folder),
   oldPath can empty, and input parameter ""
@@ -132,17 +132,17 @@ options:
         recommended oldWinSize/128<=segSize<=oldWinSize/4;
   -WD[-stepSize]                (need v5.0 patcher)
       create window diffData(HDIFFW26), optimize read old data when patch;
-      recommended as the primary diff format; when patch, and support step by step
-        patching when step by step downloading! and supports multi-thread patching!
-      requires diff by window mode, auto enable -w if not set;
+      recommended as the primary diff format; supports step-by-step patching
+        during step-by-step downloading, and supports multi-thread patching!
+      requires diff by window mode, auto enable -w-2m if not set;
       default compress by zstd, can set -c-no for no compress;
       default checksum by xxh128, can set -C-no for no checksum;
-      stepSize>=(1024*4), DEFAULT -WD-256k, recommended 128k,512k etc...
+      stepSize>=4096, DEFAULT -WD-256k, recommended 128k,512k etc...
   -SD[-stepSize]
       create single compressed diffData(HDIFFSF20 format), only need one decompress buffer
       when patch, and support step by step patching when step by step downloading!
         and supports multi-thread patching!
-      stepSize>=(1024*4), DEFAULT -SD-256k, recommended 64k,2m etc...
+      stepSize>=4096, DEFAULT -SD-256k, recommended 64k,2m etc...
   -BSD
       create diffFile compatible with bsdiff4, unsupport input directory(folder).
       also support run with -SD (not used stepSize), then create single compressed
@@ -210,7 +210,7 @@ options:
         #.DS_Store#desktop.ini#*thumbs*.db#.git*#.svn/#cache_*/00*11/*.tmp
       # means separator between names; (if char # in name, need write #: )
       * means can match any chars in name; (if char * in name, need write *: );
-      / at the end of name means must match directory;
+      / at the end of name means match the directory (including its contents);
   -g-old#ignorePath[#ignorePath#...]
       set iGnore path list in oldPath when Directory Diff;
       if oldFile can be changed, need add it in old ignore list;
@@ -231,7 +231,7 @@ options:
   -neq
       open check: if newPath & oldPath's all datas are equal, then return error;
       DEFAULT not check equal.
-  -d  Diff only, do't run patch check, DEFAULT run patch check.
+  -d  Diff only, don't run patch check, DEFAULT run patch check.
   -t  Test only, run patch check, patch(oldPath,testDiffFile)==newPath ?
   -f  Force overwrite, ignore write path already exists;
       DEFAULT (no -f) not overwrite and then return error;
@@ -281,7 +281,7 @@ options:
         (sourceWindowSize+targetWindowSize + 3*decompress buffer size)+O(1) bytes of memory.
   -p-parallelThreadNumber
       if parallelThreadNumber>1 then open multi-thread Parallel mode;
-      now only support single compressed diffData(created by hdiffz -SD-stepSize);
+      now support window diffData(created by hdiffz -WD) and single compressed diffData(created by hdiffz -SD);
       can set 1..5, DEFAULT -p-1!
   -C-checksumSets
       set Checksum data for window patch & directory patch & VCDIFF patch, DEFAULT -C-new-copy;

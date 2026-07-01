@@ -12,7 +12,7 @@
 
 [HDiffPatch] 定义了自己的补丁包格式，同时这个库也完全兼容了 [bsdiff4] 和 [endsley/bsdiff] 的补丁包格式，并[兼容](https://github.com/sisong/HDiffPatch/issues/369#issuecomment-1869798843)了 [open-vcdiff] 和 [xdelta3] 的补丁包格式 [VCDIFF(RFC 3284)]。   
 
-如果你需要在嵌入式系统(MCU、NB-IoT)等设备上进行增量更新(OTA), 可以看看例子 [HPatchLite], +[tinyuz] 解压缩器可以在1KB内存的设备上运行! HPatchLite也支持一种简单的原地更新(inplace-patch)实现，用以支持存储受限的设备。   
+如果你需要在嵌入式系统(MCU、NB-IoT)等设备上进行增量更新(OTA), 可以看看例子 [HPatchLite], 配合 [tinyuz] 解压缩器可以在1KB内存的设备上运行! HPatchLite也支持一种简单的原地更新(inplace-patch)实现，用以支持存储受限的设备。   
 
 需要更新你自己的安卓apk? 需要对Jar或Zip文件执行 diff 和 patch ? 可以试试 [ApkDiffPatch], 可以创建更小的补丁!  注意: *ApkDiffPath 不能被安卓应用商店作为增量更新所用，因为该算法要求在diff前对apk文件进行重新签名。*   
 
@@ -135,7 +135,7 @@ make -j
   -WD[-stepSize]                (需要 v5.0 版本 patcher)
       创建窗口diff格式(HDIFFW26), 优化patch时old data读取访问;
       推荐作为主要的diff格式; patch时支持边下载边patch! 并支持多线程patch!
-      需要窗口模式diff, 如果没有设置-w则自动启用;
+      需要窗口模式diff, 如果没有设置则自动启用-w-2m;
       默认压缩算法为zstd, 可以通过-c-no关闭压缩;
       默认checksum为xxh128, 可以通过-C-no关闭checksum;
       stepSize>=(1024*4), 默认 -WD-256k, 推荐128k,512k等。
@@ -206,7 +206,7 @@ make -j
         #.DS_Store#desktop.ini#*thumbs*.db#.git*#.svn/#cache_*/00*11/*.tmp
       # 意味着路径名称之间的间隔; (如果名称中有“#”号, 需要改写为“#:” )
       * 意味着匹配名称中的任意一段字符; (如果名称中有“*”号, 需要改写为“*:” )
-      / 如果该符号放在名称末尾,意味着必须匹配文件夹;
+      / 如果该符号放在名称末尾,意味着匹配文件夹(包括文件夹内的所有文件与子目录);
   -g-old#ignorePath[#ignorePath#...]
       为文件夹间的diff设置忽略旧版本的路径;
       如果旧版本中的某个文件数据可以被运行中的程序改动,那可以将该文件放到该忽略列表中;
@@ -281,7 +281,7 @@ make -j
       当前支持单压缩流补丁文件(用hdiffz -SD-stepSize创建)和window diff格式补丁文件(用hdiffz -WD所创建);
       可以设置值 1..5, 默认 -p-1 (即单线程)!
   -C-checksumSets
-      为窗口补丁、文件夹补丁、VCDIFF补丁设置校验方式, 默认设置为 -C-new;
+      为窗口补丁、文件夹补丁、VCDIFF补丁设置校验方式, 默认设置为 -C-new-copy;
       校验设置支持(可以多选):
         -C-no           不执行校验;
         -C-new          校验有修改过的新版本的文件;

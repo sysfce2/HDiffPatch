@@ -186,7 +186,7 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
     
     //default once I/O (read/write) byte size
     #ifndef hpatch_kStreamCacheSize
-    #   define hpatch_kStreamCacheSize      (1024*4)
+    #   define hpatch_kStreamCacheSize      4096
     #endif
     #ifndef hpatch_kFileIOBufBetterSize
     #   define hpatch_kFileIOBufBetterSize  (1024*64)
@@ -207,7 +207,7 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
     typedef struct hpatch_compressedDiffInfo{
         hpatch_StreamPos_t  newDataSize;
         hpatch_StreamPos_t  oldDataSize;
-        hpatch_uint         compressedCount;//need open hpatch_decompressHandle number
+        hpatch_uint         compressedCount;//number of decompress handles that must be opened simultaneously
         char                compressType[hpatch_kMaxPluginTypeLength+1]; //ascii cstring 
     } hpatch_compressedDiffInfo;
     
@@ -220,7 +220,7 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
         hpatch_dec_close_error,
     } hpatch_dec_error_t;
     typedef struct hpatch_TDecompress{
-        hpatch_BOOL        (*is_can_open)(const char* compresseType);
+        hpatch_BOOL        (*is_can_open)(const char* compressType);
         //error return 0.
         hpatch_decompressHandle   (*open)(struct hpatch_TDecompress* decompressPlugin,
                                           hpatch_StreamPos_t dataSize,
@@ -238,7 +238,7 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
                                           const struct hpatch_TStreamInput* codeStream,
                                           hpatch_StreamPos_t code_begin,
                                           hpatch_StreamPos_t code_end);
-        volatile hpatch_dec_error_t decError; //if you used decError value, once patch must used it's own hpatch_TDecompress
+        volatile hpatch_dec_error_t decError; //if decError is read, each patch session must use its own hpatch_TDecompress instance
     } hpatch_TDecompress;
     #define _hpatch_update_decError(decompressPlugin,errorCode) \
         do { if ((decompressPlugin)->decError==hpatch_dec_ok)   \
@@ -338,7 +338,7 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
 
     typedef struct sspatch_coversListener_t{
         void*         import;
-        void        (*onStepCoversReset)(struct sspatch_coversListener_t* listener,hpatch_StreamPos_t leaveCoverCount);//can NULL, data(in covers_cache) will invalid; if leaveCoverCount==0, step finish 
+        void        (*onStepCoversReset)(struct sspatch_coversListener_t* listener,hpatch_StreamPos_t leaveCoverCount);//can be NULL; data in covers_cache will become invalid; if leaveCoverCount==0, the step is finished
         void        (*onStepCovers)(struct sspatch_coversListener_t* listener,
                                     const unsigned char* covers_cache,const unsigned char* covers_cacheEnd);//if covers_cache==covers_cacheEnd==0, step finish
     } sspatch_coversListener_t;
@@ -382,7 +382,8 @@ static hpatch_force_inline hpatch_StreamPos_t _hpatch_pos_max(hpatch_StreamPos_t
         hpatch_StreamPos_t  compressedSize;        //0 uncompressed, >0 compressed
         hpatch_StreamPos_t  otherInfoPos;
         hpatch_StreamPos_t  otherInfoEndPos;
-        hpatch_StreamPos_t  windowDataPos;         //window data begin pos; old,new,diff's checksum begin pos=windowDataPos-3*checksumByteSize
+        hpatch_StreamPos_t  windowDataPos; //window data begin pos(compressed data begin pos);
+                                           //the checksum section for old/new/diff data begin pos = windowDataPos-3*checksumByteSize;
         hpatch_StreamPos_t  _headFixedInfoPos;
         char                compressType[hpatch_kMaxPluginTypeLength+1];
         char                checksumType[hpatch_kMaxPluginTypeLength+1];

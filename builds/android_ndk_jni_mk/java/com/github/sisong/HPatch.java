@@ -17,7 +17,7 @@ public class HPatch{
     //  if need supported oldFileName or outNewFileName is directory, build .so with DIR=1 can opened;
     //  threadNum: 1..5, default 1; >1 opened multi-thread patching;
     //      now support single compressed diffData(created by hdiffz -SD) & window diffData(created by hdiffz -WD, recommended)
-    //  isChecksumNewData: default true; checsum newData when patching VCDIFF and window diffData;
+    //  isChecksumNewData: default true; auto checksum newData when patching VCDIFF and window diffData;
     public static native int patch(String oldFileName,String diffFileName,String outNewFileName,long cacheMemory,int _threadNum,boolean isChecksumNewData);
     public static final int patch(String oldFileName,String diffFileName,String outNewFileName,long cacheMemory,int _threadNum){
         return patch(oldFileName,diffFileName,outNewFileName,cacheMemory,_threadNum,true);

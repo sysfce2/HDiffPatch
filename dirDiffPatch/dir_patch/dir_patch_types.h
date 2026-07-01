@@ -52,11 +52,11 @@ extern "C" {
 #endif
 
 #ifdef _WIN32
-static const char kPatch_dirSeparator = '\\';
+#define kPatch_dirSeparator '\\'
 #else
-static const char kPatch_dirSeparator = '/';
+#define kPatch_dirSeparator '/'
 #endif
-static const char kPatch_dirSeparator_saved = '/';
+#define kPatch_dirSeparator_saved '/'
 
 static hpatch_inline  //align upper
 hpatch_StreamPos_t toAlignRangeSize(hpatch_StreamPos_t rangeSize,size_t kAlignSize)

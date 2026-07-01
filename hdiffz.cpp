@@ -146,13 +146,14 @@ static void printHelpInfo(){
 static void printUsage(){
     printVersion();
     printf("\n");
-    printf("diff    usage: hdiffz [options] oldPath newPath outDiffFile\n"
-           "test    usage: hdiffz    -t     oldPath newPath testDiffFile\n"
-           "resave  usage: hdiffz [-c-...]  diffFile outDiffFile\n"
-           "print    info: hdiffz -info diffFile\n"
+    printf("diff     usage: hdiffz [options] oldPath newPath outDiffFile\n"
+           "compress usage: hdiffz [-c-...] \"\" newPath outDiffFile\n"
+           "test     usage: hdiffz    -t     oldPath newPath testDiffFile\n"
+           "resave   usage: hdiffz [-c-...]  diffFile outDiffFile\n"
+           "print     info: hdiffz -info diffFile\n"
 #if (_IS_NEED_DIR_DIFF_PATCH)
-           "get  manifest: hdiffz [-g#...] [-C-checksumType] inputPath -M#outManifestTxtFile\n"
-           "manifest diff: hdiffz [options] -M-old#oldManifestFile -M-new#newManifestFile\n"
+           "get   manifest: hdiffz [-g#...] [-C-checksumType] inputPath -M#outManifestTxtFile\n"
+           "manifest  diff: hdiffz [options] -M-old#oldManifestFile -M-new#newManifestFile\n"
            "                      oldPath newPath outDiffFile\n"
            "  oldPath newPath inputPath can be file or directory(folder),\n"
 #endif
@@ -193,9 +194,9 @@ static void printUsage(){
            "        recommended oldWinSize/128<=segSize<=oldWinSize/4;\n"
            "  -WD[-stepSize]                (need v5.0 patcher)\n"
            "      create window diffData(HDIFFW26), optimize read old data when patch;\n"
-           "      recommended as the primary diff format; when patch, and support step by step\n"
-           "        patching when step by step downloading! and supports multi-thread patching!\n"
-           "      requires diff by window mode, auto enable -w if not set;\n"
+           "      recommended as the primary diff format; supports step-by-step patching\n"
+           "        during step-by-step downloading, and supports multi-thread patching!\n"
+           "      requires diff by window mode, auto enable -w-2m if not set;\n"
 #ifdef _CompressPlugin_zstd
            "      default compress by zstd, can set -c-no for no compress;\n"
 #else
@@ -395,7 +396,7 @@ static void printUsage(){
            "        #.DS_Store#desktop.ini#*thumbs*.db#.git*#.svn/#cache_*/00*11/*.tmp\n"
            "      # means separator between names; (if char # in name, need write #: )\n"
            "      * means can match any chars in name; (if char * in name, need write *: );\n"
-           "      / at the end of name means must match directory;\n"
+           "      / at the end of name means match the directory (including its contents);\n"
            "  -g-old#ignorePath[#ignorePath#...]\n"
            "      set iGnore path list in oldPath when Directory Diff;\n"
            "      if oldFile can be changed, need add it in old ignore list;\n"
@@ -417,7 +418,7 @@ static void printUsage(){
            "  -neq\n"
            "      open check: if newPath & oldPath's all datas are equal, then return error; \n"
            "      DEFAULT not check equal.\n"
-           "  -d  Diff only, do't run patch check, DEFAULT run patch check.\n"
+           "  -d  Diff only, don't run patch check, DEFAULT run patch check.\n"
            "  -t  Test only, run patch check, patch(oldPath,testDiffFile)==newPath ? \n"
            "  -f  Force overwrite, ignore write path already exists;\n"
            "      DEFAULT (no -f) not overwrite and then return error;\n"
@@ -856,7 +857,7 @@ static int _checkSetCompress(hdiff_TCompress** out_compressPlugin,
 #define _kNULL_SIZE     (~(size_t)0)
 
 #define _THREAD_NUMBER_NULL     _kNULL_SIZE
-#define _THREAD_NUMBER_DEFUALT  kDefaultCompressThreadNumber
+#define _THREAD_NUMBER_DEFAULT  kDefaultCompressThreadNumber
 #define _THREAD_NUMBER_MAX      (1<<8)
 
 int hdiff_cmd_line(int argc, const char * argv[]){
@@ -1126,8 +1127,8 @@ int hdiff_cmd_line(int argc, const char * argv[]){
                 _options_check((op[2]!='\0'), "-n?");
 #if (_IS_NEED_DIR_DIFF_PATCH)
                 if (op[2]=='-'){
-                    _options_check((kMaxOpenFileNumber == _kNULL_SIZE), "-n-")
-                        const char* pnum = op + 3;
+                    _options_check((kMaxOpenFileNumber == _kNULL_SIZE), "-n-");
+                    const char* pnum = op + 3;
                     _options_check(kmg_to_size(pnum, strlen(pnum), &kMaxOpenFileNumber), "-n-?");
                     _options_check((kMaxOpenFileNumber != _kNULL_SIZE), "-n-?");
                 }else
@@ -1272,7 +1273,7 @@ int hdiff_cmd_line(int argc, const char * argv[]){
     if (diffSets.isDiffInMem&&(diffSets.matchBlockSize==_kNULL_SIZE))
         diffSets.matchBlockSize=kDefaultFastMatchBlockSize;
     if (diffSets.threadNum==_THREAD_NUMBER_NULL)
-        diffSets.threadNum=_THREAD_NUMBER_DEFUALT;
+        diffSets.threadNum=_THREAD_NUMBER_DEFAULT;
     else if (diffSets.threadNum>_THREAD_NUMBER_MAX)
         diffSets.threadNum=_THREAD_NUMBER_MAX;
     else if (diffSets.threadNum<1)
